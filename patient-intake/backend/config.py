@@ -34,20 +34,6 @@ class Settings(BaseSettings):
     cerner_client_id: str = ""
     cerner_client_secret: str = ""
 
-    # LLM provider switching — change LLM_PROVIDER in .env to swap
-    # Options: claude | openai | gemini | groq
-    # Set the matching model and API key for the chosen provider
-    llm_provider: str = "claude"
-    llm_model: str = "claude-haiku-4-5"
-
-    # Provider API keys (only the active provider key is required at runtime)
-    openai_api_key: str = ""
-    gemini_api_key: str = ""
-    groq_api_key: str = ""
-
-    # Hugging Face token (for authenticating with HF Space MCP servers)
-    hf_token: str = ""
-
     # MCP server URLs (ngrok or deployed public URLs)
     mcp_patient_lookup_url: str = "http://localhost:5001/sse"
     mcp_eligibility_url: str = "http://localhost:5002/sse"

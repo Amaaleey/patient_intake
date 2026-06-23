@@ -46,24 +46,6 @@ async def send_message(request: MessageRequest, req: Request):
 
         if response["status"] == "complete" and response["data"]:
             collected_data = response["data"]
-
-            # ── Idempotency guard — skip if this session already completed ──
-            db = SessionLocal()
-            existing = db.query(IntakeSession).filter(
-                IntakeSession.session_id == request.session_id,
-                IntakeSession.status == "completed",
-            ).first()
-            if existing:
-                db.close()
-                return {
-                    "reply": response["reply"],
-                    "status": "complete",
-                    "data": existing.collected_data,
-                    "patient_id": existing.patient_id,
-                    "fhir_id": None,
-                }
-            db.close()
-
             patient_id = str(uuid.uuid4())
 
             # FHIR write — non-blocking, patient record saved in DB regardless

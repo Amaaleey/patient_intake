@@ -127,9 +127,8 @@ RETURNING patient:
   Ask for full name, then date of birth (MM/DD/YYYY) only.
   As soon as you have name + DOB, call `lookup_patient`.
   If record found:
-    - Do NOT reveal the city or state. Ask: "I found a record — can you tell me the city and state we have on file for you?"
-    - The patient must volunteer the city and state unprompted — do not hint, suggest, or show any part of it.
-    - If their answer matches the record: go to STEP 3.
+    - Show only city and state: "I found a record — can you confirm the city and state we have on file?"
+    - If match: go to STEP 3.
     - If no match: ask for zip code as secondary check.
     - If zip also fails: output {"status": "staff_requested"}
   If NOT_FOUND:
@@ -143,10 +142,7 @@ NEW patient:
   Then go to STEP 3.
 
 STEP 3 — CONFIRM DETAILS
-RETURNING: Ask "Are your phone number and email address still the same as what we have on file?"
-  - Do NOT show or repeat the phone number or email — not even partial digits.
-  - If yes: move on.
-  - If no: ask what changed and update it.
+RETURNING: confirm phone (last 4 digits only) and email on file. Update if changed.
 NEW: skip to STEP 4.
 
 STEP 4 — INSURANCE
@@ -163,19 +159,8 @@ Options: 1. Family Medicine  2. OB/GYN  3. Cardiology  4. Urgent Care
 STEP 6 — REASON FOR VISIT
 Ask: "Briefly describe why you're coming in today — your doctor will see this before your appointment."
 Accept free text exactly as typed.
-
-CLARIFICATION RULE — before running any checks:
-  If the patient's response is vague, a single word, or too brief to assess severity
-  (examples: "headache", "pain", "not feeling well", "sick", "tired", "checkup"),
-  ask ONE follow-up clarification question before proceeding.
-  Examples of good clarification questions:
-    - "Can you tell me a bit more — how severe is it, and how long have you had it?"
-    - "Is this something that came on suddenly, or has it been going on for a while?"
-  Wait for their clarification answer, then run the EMERGENCY CHECK and DEPARTMENT ALIGNMENT CHECK
-  defined in CLINICAL GUIDELINES before proceeding.
-
-  If the response is already detailed enough to assess (e.g. "I've had a mild headache for 3 days"),
-  skip clarification and run the checks immediately.
+Then immediately run the EMERGENCY CHECK and DEPARTMENT ALIGNMENT CHECK
+defined in CLINICAL GUIDELINES before proceeding.
 
 STEP 7 — SCHEDULING
 Call `fhir_get_slots` with the chosen department.
@@ -185,7 +170,7 @@ STEP 8 — SAVE AND COMPLETE
 Call `fhir_create_patient` with all collected fields.
 Say: "Perfect! You're booked with [doctor] on [date] at [time]. You're all set — see you soon! ✓"
 
-Then output ONLY this JSON on a new line — no markdown, no code fences, no backticks:
+Then output ONLY this JSON on a new line:
 {"status": "complete", "data": {"name": "", "dob": "", "phone": "", "email": "", "insurance_id": "", "payer": "", "copay": "", "department": "", "reason": "", "appointment_doctor": "", "appointment_date": "", "appointment_time": ""}}
 
 After any completion or redirect, if the patient says anything else reply with:
@@ -267,7 +252,7 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
             messages=history,
         )
 
-        # ── REMOTE MCP (swap when ngrok/deployed) ─────────────────────────
+        # # ── REMOTE MCP (swap when ngrok/deployed) ─────────────────────────
         # response = anthropic_client.beta.messages.create(
         #     model=MODEL,
         #     max_tokens=800,
@@ -308,16 +293,13 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
 
     redis_client.setex(history_key, 86400, json.dumps(history))
 
-    # Strip markdown code fences before any JSON parsing
-    import re
-    t = re.sub(r"```[a-z]*\n?", "", assistant_text).replace("```", "").strip()
-
     result = {"reply": assistant_text, "status": "collecting", "data": None}
 
-    if '{"status": "emergency_redirect"}' in t:
-        friendly = t[:t.find('{"status": "emergency_redirect"}')].strip()
+    if '{"status": "emergency_redirect"}' in assistant_text:
+        friendly = assistant_text[:assistant_text.find('{"status": "emergency_redirect"}')].strip()
         result.update({"reply": friendly, "status": "emergency_redirect"})
-        is_crisis = any(kw in t.lower() for kw in ["988", "suicidal", "self-harm"])
+        text_lower = assistant_text.lower()
+        is_crisis  = any(kw in text_lower for kw in ["988", "suicidal", "self-harm"])
         asyncio.create_task(_send_crisis_alert(
             session_id=session_id,
             alert_type="mental_health_crisis" if is_crisis else "medical_emergency",
@@ -326,20 +308,20 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
         ))
         return result
 
-    if '{"status": "staff_requested"}' in t:
-        friendly = t[:t.find('{"status": "staff_requested"}')].strip()
+    if '{"status": "staff_requested"}' in assistant_text:
+        friendly = assistant_text[:assistant_text.find('{"status": "staff_requested"}')].strip()
         result.update({"reply": friendly, "status": "staff_requested"})
         return result
 
-    if '{"status": "complete"' in t:
+    if '{"status": "complete"' in assistant_text:
         try:
-            json_str = t[t.find('{"status": "complete"'):]
+            json_str = assistant_text[assistant_text.find('{"status": "complete"'):]
             parsed   = json.loads(json_str)
             if parsed.get("status") == "complete":
                 data = parsed.get("data", {})
                 for f in ["department","copay","appointment_doctor","appointment_date","appointment_time"]:
                     data.setdefault(f, "")
-                friendly = t[:t.find('{"status": "complete"')].strip()
+                friendly = assistant_text[:assistant_text.find('{"status": "complete"')].strip()
                 if not friendly:
                     friendly = (
                         f"Perfect! You're booked with {data.get('appointment_doctor','your doctor')}"
