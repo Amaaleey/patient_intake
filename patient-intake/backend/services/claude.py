@@ -20,6 +20,7 @@ import httpx
 from anthropic import Anthropic
 from config import settings
 from services.mcp_client import call_tool
+from services.sms import send_appointment_confirmation
 
 CRISIS_NOTIFIER_URL = os.getenv("CRISIS_NOTIFIER_URL", "http://localhost:8001")
 
@@ -127,7 +128,7 @@ RETURNING patient:
   Ask for full name, then date of birth (MM/DD/YYYY) only.
   As soon as you have name + DOB, call `lookup_patient`.
   If record found:
-    - Show only city and state: "I found a record — can you confirm the city and state we have on file?"
+    - Ask them to tell you their city and state: "I found a record — what city and state do you have on file with us?"
     - If match: go to STEP 3.
     - If no match: ask for zip code as secondary check.
     - If zip also fails: output {"status": "staff_requested"}
@@ -142,11 +143,14 @@ NEW patient:
   Then go to STEP 3.
 
 STEP 3 — CONFIRM DETAILS
-RETURNING: confirm phone (last 4 digits only) and email on file. Update if changed.
+RETURNING: confirm phone showing ONLY last 4 digits — say "ending in XXXX". Never show full phone number.
+  Show email masked — first 3 characters then ****@domain. Example: gro****@example.net. Update if changed.
 NEW: skip to STEP 4.
 
 STEP 4 — INSURANCE
-RETURNING: confirm insurance on file. Call `check_eligibility`. Share copay result.
+RETURNING: confirm insurance by payer name only — never show the member ID. 
+    Say "You have [Payer] on file — is that still your current insurance?" 
+    Call `check_eligibility`. Share copay result only.
 NEW: ask for payer name and member ID. Call `check_eligibility`. Share copay result.
      If self-pay: set payer="Self-pay", insurance_id="NONE". Skip eligibility check.
      Always use EXACTLY what the patient typed for payer name — never rename it.
@@ -330,6 +334,16 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
                     )
                 result.update({"reply": friendly, "status": "complete", "data": data})
                 redis_client.setex(collected_key, 86400, json.dumps(data))
+                # Send SMS confirmation. When you upgrade to a paid Twilio account, remove TWILIO_TO_NUMBER from .env and it'll send to the actual patient's phone automatically.
+                to_number = os.getenv("TWILIO_TO_NUMBER", data.get("phone", ""))
+                send_appointment_confirmation(
+                    to_number=to_number,  # uses your verified number in trial
+                    patient_name=data.get("name", ""),
+                    doctor=data.get("appointment_doctor", ""),
+                    date=data.get("appointment_date", ""),
+                    time=data.get("appointment_time", ""),
+                    department=data.get("department", ""),
+                )
         except json.JSONDecodeError:
             pass
 

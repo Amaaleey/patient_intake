@@ -1,8 +1,15 @@
 import os
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(
+        env_file="../.env",
+        case_sensitive=False,
+        extra="ignore"
+    )
+
     # Core
     anthropic_api_key: str
     database_url: str
@@ -38,10 +45,6 @@ class Settings(BaseSettings):
     mcp_patient_lookup_url: str = "http://localhost:5001/sse"
     mcp_eligibility_url: str = "http://localhost:5002/sse"
     mcp_ehr_url: str = "http://localhost:5003/sse"
-
-    class Config:
-        env_file = "../.env"
-        case_sensitive = False
 
 
 settings = Settings()

@@ -170,13 +170,16 @@ async def call_tool_http(request: Request):
     tool_name  = body.get("tool")
     tool_input = body.get("input", {})
     try:
-        # Call the tool function directly by name
-        tool_fn = globals().get(tool_name)
-        if not tool_fn:
-            return JSONResponse({"error": f"Tool not found: {tool_name}"}, status_code=404)
-        result = tool_fn(**tool_input)
-        return JSONResponse({"result": result})
+        if tool_name == "check_eligibility":
+            result = _check_mock(
+                insurance_id=tool_input.get("insurance_id", ""),
+                payer=tool_input.get("payer", ""),
+            )
+            return JSONResponse({"result": json.dumps(result)})
+        return JSONResponse({"error": f"Tool not found: {tool_name}"}, status_code=404)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
 
 if __name__ == "__main__":

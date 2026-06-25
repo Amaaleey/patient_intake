@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 from config import settings
+import uuid
 
 Base = declarative_base()
 engine = create_engine(settings.database_url)
@@ -12,8 +13,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 class Patient(Base):
     __tablename__ = "patients"
 
-    id = Column(String, primary_key=True, index=True)
-    fhir_id = Column(String, unique=True, index=True)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
+    fhir_id = Column(String, index=True)  # removed unique=True
 
     # Identity
     name = Column(String)
