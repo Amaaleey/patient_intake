@@ -27,19 +27,16 @@ CRISIS_NOTIFIER_URL = os.getenv("CRISIS_NOTIFIER_URL", "http://localhost:8001")
 redis_client     = redis.from_url(settings.redis_url)
 anthropic_client = Anthropic(api_key=settings.anthropic_api_key)
 
-MODEL              = "claude-haiku-4-5"
+MODEL               = "claude-haiku-4-5"
 MAX_TOOL_ITERATIONS = 10
 MAX_LOOKUP_RETRIES  = 3
 
-# ── Remote MCP server list (used when switching to beta.messages.create) ───
-# Update these URLs when using ngrok or deploying
 MCP_SERVERS = [
     {"type": "url", "url": os.getenv("MCP_PATIENT_LOOKUP_URL", "http://localhost:5001/sse"), "name": "patient-lookup"},
     {"type": "url", "url": os.getenv("MCP_ELIGIBILITY_URL",    "http://localhost:5002/sse"), "name": "eligibility"},
     {"type": "url", "url": os.getenv("MCP_EHR_URL",            "http://localhost:5003/sse"), "name": "ehr"},
 ]
 
-# ── Tool schema (used with local routing via mcp_client) ───────────────────
 TOOLS = [
     {
         "name": "lookup_patient",
@@ -83,24 +80,26 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "name":               {"type": "string"},
-                "dob":                {"type": "string"},
-                "phone":              {"type": "string"},
-                "email":              {"type": "string"},
-                "insurance_id":       {"type": "string"},
-                "payer":              {"type": "string"},
-                "department":         {"type": "string"},
-                "reason":             {"type": "string"},
-                "appointment_doctor": {"type": "string"},
-                "appointment_date":   {"type": "string"},
-                "appointment_time":   {"type": "string"},
+                "name":                  {"type": "string"},
+                "dob":                   {"type": "string"},
+                "phone":                 {"type": "string"},
+                "email":                 {"type": "string"},
+                "insurance_id":          {"type": "string"},
+                "payer":                 {"type": "string"},
+                "department":            {"type": "string"},
+                "reason":                {"type": "string"},
+                "appointment_doctor":    {"type": "string"},
+                "appointment_date":      {"type": "string"},
+                "appointment_time":      {"type": "string"},
+                "guardian_name":         {"type": "string"},
+                "guardian_relationship": {"type": "string"},
             },
             "required": ["name", "dob"],
         },
     },
 ]
 
-# ── Load clinical guidelines ───────────────────────────────────────────────
+
 def _load_guidelines() -> str:
     for path in [
         pathlib.Path(__file__).parent.parent.parent / "AGENT_GUIDELINES.md",
@@ -110,9 +109,7 @@ def _load_guidelines() -> str:
             return "\n\n---\nCLINICAL GUIDELINES (follow these exactly):\n" + path.read_text()
     return ""
 
-# ── System prompt — conversation flow only ────────────────────────────────
-# Clinical rules, emergency handling, and behavior rules live in
-# AGENT_GUIDELINES.md and are appended at runtime via _load_guidelines().
+
 SYSTEM_PROMPT = """You are a friendly front-desk medical receptionist AI.
 Speak in short natural sentences. One question per turn. Never ask more than one question at a time.
 When the user says "begin" respond with your opening greeting only.
@@ -129,7 +126,7 @@ RETURNING patient:
   As soon as you have name + DOB, call `lookup_patient`.
   If record found:
     - Ask them to tell you their city and state: "I found a record — what city and state do you have on file with us?"
-    - If match: go to STEP 3.
+    - If match: go to MINOR CHECK.
     - If no match: ask for zip code as secondary check.
     - If zip also fails: output {"status": "staff_requested"}
   If NOT_FOUND:
@@ -140,16 +137,32 @@ RETURNING patient:
 NEW patient:
   Collect one at a time: full name → DOB (MM/DD/YYYY) → phone → email.
   Validate each field using the rules in CLINICAL GUIDELINES before accepting.
-  Then go to STEP 3.
+  Then go to MINOR CHECK.
+
+MINOR CHECK (run immediately after DOB is collected, before asking for phone or email):
+  Calculate the patient's age from their DOB.
+  If age < 18:
+    Say: "I see this appointment is for a minor. We'll need a parent or guardian to complete the registration."
+    Then collect one at a time:
+    - "What is your full name?" (guardian name)
+    - - "What is your relationship to [patient name]?" 
+  Accept answers like: mother, father, parent, grandparent, legal guardian, stepparent.
+  The guardian is describing their relationship TO the child, not the child's relationship to them.
+    Say: "Thank you, [guardian name]. I'll note that you are booking on behalf of [patient name]."
+    Store guardian_name and guardian_relationship.
+    Then continue collecting phone and email as normal in STEP 2 — these will be the guardian's contact details.
+    Then go to STEP 4 — INSURANCE. Do not skip insurance for minor patients.
+  If age >= 18: continue collecting phone and email normally.
 
 STEP 3 — CONFIRM DETAILS
 RETURNING: confirm phone showing ONLY last 4 digits — say "ending in XXXX". Never show full phone number.
-  Show email masked — first 3 characters then ****@domain. Example: gro****@example.net. Update if changed.
+  Show email ALWAYS masked — first 3 characters then ****@domain. Example: chr****@example.com. Never show full email.
+  Update if changed.
 NEW: skip to STEP 4.
 
 STEP 4 — INSURANCE
-RETURNING: confirm insurance by payer name only — never show the member ID. 
-    Say "You have [Payer] on file — is that still your current insurance?" 
+RETURNING: confirm insurance by payer name only — never show the member ID.
+    Say "You have [Payer] on file — is that still your current insurance?"
     Call `check_eligibility`. Share copay result only.
 NEW: ask for payer name and member ID. Call `check_eligibility`. Share copay result.
      If self-pay: set payer="Self-pay", insurance_id="NONE". Skip eligibility check.
@@ -165,24 +178,33 @@ Ask: "Briefly describe why you're coming in today — your doctor will see this 
 Accept free text exactly as typed.
 Then immediately run the EMERGENCY CHECK and DEPARTMENT ALIGNMENT CHECK
 defined in CLINICAL GUIDELINES before proceeding.
+If the reason is vague (e.g. "headache", "pain", "not feeling well"), ask one follow-up:
+"Can you tell me more — how severe is it and how long have you had it?"
+Use their answer to run the EMERGENCY CHECK before proceeding to scheduling.
 
 STEP 7 — SCHEDULING
 Call `fhir_get_slots` with the chosen department.
 Present slots numbered, one per line. Wait for patient to pick a number.
 
 STEP 8 — SAVE AND COMPLETE
-Call `fhir_create_patient` with all collected fields.
+Call `fhir_create_patient` with all collected fields including guardian_name and guardian_relationship if applicable.
 Say: "Perfect! You're booked with [doctor] on [date] at [time]. You're all set — see you soon! ✓"
 
+If copay > 0, immediately follow with:
+"Your copay for this visit is $[amount]. Would you like to pay now or at the clinic?"
+Wait for patient response.
+- If they say "now" or "pay now" → say "Great! Let's take care of that now." then output the complete JSON with "payment": "now"
+- If they say "later" or "at the clinic" → say "No problem! You can pay at the clinic or via your patient portal." then output the complete JSON with "payment": "later"
+If copay is 0 or self-pay → skip the payment question, set "payment": "later", and output the JSON directly.
+
 Then output ONLY this JSON on a new line:
-{"status": "complete", "data": {"name": "", "dob": "", "phone": "", "email": "", "insurance_id": "", "payer": "", "copay": "", "department": "", "reason": "", "appointment_doctor": "", "appointment_date": "", "appointment_time": ""}}
+{"status": "complete", "data": {"name": "", "dob": "", "phone": "", "email": "", "insurance_id": "", "payer": "", "copay": "", "department": "", "reason": "", "appointment_doctor": "", "appointment_date": "", "appointment_time": "", "guardian_name": "", "guardian_relationship": ""}, "payment": "later"}
 
 After any completion or redirect, if the patient says anything else reply with:
 {"status": "ended"}
 """
 
 
-# ── Crisis alert ───────────────────────────────────────────────────────────
 async def _send_crisis_alert(
     session_id: str,
     alert_type: str,
@@ -230,7 +252,6 @@ async def _send_crisis_alert(
         print(f"[crisis] Could not reach notifier: {e}")
 
 
-# ── Main chat loop ─────────────────────────────────────────────────────────
 async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -> dict:
     history_key   = f"session:{session_id}:history"
     collected_key = f"session:{session_id}:collected"
@@ -245,9 +266,6 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
     system         = SYSTEM_PROMPT + _load_guidelines()
 
     for _ in range(MAX_TOOL_ITERATIONS):
-
-        # ── LOCAL routing (current) ────────────────────────────────────────
-        # Tools schema sent to Claude; mcp_client routes execution to MCP servers
         response = anthropic_client.messages.create(
             model=MODEL,
             max_tokens=800,
@@ -255,16 +273,6 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
             tools=TOOLS,
             messages=history,
         )
-
-        # # ── REMOTE MCP (swap when ngrok/deployed) ─────────────────────────
-        # response = anthropic_client.beta.messages.create(
-        #     model=MODEL,
-        #     max_tokens=800,
-        #     system=system,
-        #     messages=history,
-        #     mcp_servers=MCP_SERVERS,
-        #     betas=["mcp-client-2025-04-04"],
-        # )
 
         if response.stop_reason != "tool_use":
             assistant_text = "".join(
@@ -323,21 +331,27 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
             parsed   = json.loads(json_str)
             if parsed.get("status") == "complete":
                 data = parsed.get("data", {})
-                for f in ["department","copay","appointment_doctor","appointment_date","appointment_time"]:
+                for f in ["department", "copay", "appointment_doctor", "appointment_date",
+                          "appointment_time", "guardian_name", "guardian_relationship"]:
                     data.setdefault(f, "")
                 friendly = assistant_text[:assistant_text.find('{"status": "complete"')].strip()
                 if not friendly:
                     friendly = (
-                        f"Perfect! You're booked with {data.get('appointment_doctor','your doctor')}"
-                        f" on {data.get('appointment_date','')} at {data.get('appointment_time','')}."
+                        f"Perfect! You're booked with {data.get('appointment_doctor', 'your doctor')}"
+                        f" on {data.get('appointment_date', '')} at {data.get('appointment_time', '')}."
                         " You're all set — see you soon! ✓"
                     )
-                result.update({"reply": friendly, "status": "complete", "data": data})
+                result.update({
+                    "reply":   friendly,
+                    "status":  "complete",
+                    "data":    data,
+                    "payment": parsed.get("payment", "later"),
+                })
+                print(f"[intake] Payment decision: {parsed.get('payment', 'later')} — copay: {data.get('copay', '0')}")
                 redis_client.setex(collected_key, 86400, json.dumps(data))
-                # Send SMS confirmation. When you upgrade to a paid Twilio account, remove TWILIO_TO_NUMBER from .env and it'll send to the actual patient's phone automatically.
                 to_number = os.getenv("TWILIO_TO_NUMBER", data.get("phone", ""))
                 send_appointment_confirmation(
-                    to_number=to_number,  # uses your verified number in trial
+                    to_number=to_number,
                     patient_name=data.get("name", ""),
                     doctor=data.get("appointment_doctor", ""),
                     date=data.get("appointment_date", ""),

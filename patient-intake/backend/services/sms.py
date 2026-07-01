@@ -1,60 +1,3 @@
-# """
-# sms.py — SMS confirmation service via Twilio.
-# Sends appointment confirmation after booking is complete.
-# """
-# import os
-# from dotenv import load_dotenv
-# from twilio.rest import Client
-
-# # Load .env from either location
-# for env_path in [
-#     os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
-#     os.path.join(os.path.dirname(__file__), "..", ".env"),
-# ]:
-#     if os.path.exists(env_path):
-#         load_dotenv(env_path)
-#         break
-
-
-# def send_appointment_confirmation(
-#     to_number: str,
-#     patient_name: str,
-#     doctor: str,
-#     date: str,
-#     time: str,
-#     department: str,
-# ) -> bool:
-#     """
-#     Send SMS appointment confirmation to patient.
-#     Returns True if sent successfully, False otherwise.
-#     """
-#     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-#     auth_token  = os.getenv("TWILIO_AUTH_TOKEN")
-#     from_number = os.getenv("TWILIO_FROM_NUMBER")
-
-#     if not all([account_sid, auth_token, from_number]):
-#         print("[sms] Twilio credentials not configured — skipping SMS")
-#         return False
-
-#     try:
-#         client = Client(account_sid, auth_token)
-#         message = client.messages.create(
-#             body=(
-#                 f"Confirmed: {patient_name} with {doctor}, "
-#                 f"{date} at {time} ({department}). "
-#                 f"- Ledelsea Health"
-#             ),
-#             from_=from_number,
-#             to=f"+1{to_number}" if not to_number.startswith("+") else to_number,
-#         )
-#         print(f"[sms] Confirmation sent to {to_number} — SID: {message.sid}")
-#         return True
-
-#     except Exception as e:
-#         print(f"[sms] Failed to send SMS: {e}")
-#         return False
-
-
 import smtplib
 from email.mime.text import MIMEText
 import os
@@ -70,6 +13,7 @@ for env_path in [
         break
 
 print("[sms] GMAIL_USER:", os.getenv("GMAIL_USER"))
+
 def send_appointment_confirmation(to_number, patient_name, doctor, date, time, department):
     # Use email for dev, swap back to Twilio when A2P approved
     gmail_user = os.getenv("GMAIL_USER")
@@ -104,4 +48,48 @@ def send_appointment_confirmation(to_number, patient_name, doctor, date, time, d
         return True
     except Exception as e:
         print(f"[sms] Email failed: {e}")
+        return False
+    
+def send_payment_receipt(
+    patient_name: str,
+    doctor: str,
+    date: str,
+    time: str,
+    department: str,
+    amount: str,
+    payment_date: str,
+) -> bool:
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    to_email   = os.getenv("DEV_NOTIFY_EMAIL", gmail_user)
+
+    if not gmail_user:
+        print("[sms] Email not configured — skipping receipt")
+        return False
+
+    try:
+        msg = MIMEText(
+            f"Hi {patient_name},\n\n"
+            f"Payment received — thank you!\n\n"
+            f"Receipt\n"
+            f"-------\n"
+            f"Amount paid:   ${amount}\n"
+            f"Date paid:     {payment_date}\n"
+            f"Doctor:        {doctor}\n"
+            f"Department:    {department}\n"
+            f"Appointment:   {date} at {time}\n\n"
+            f"Your copay has been processed. See you at your appointment!\n\n"
+            f"— Ledelsea Health"
+        )
+        msg["Subject"] = f"Payment Receipt — ${amount} for {patient_name}"
+        msg["From"]    = gmail_user
+        msg["To"]      = to_email
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(gmail_user, gmail_pass)
+            smtp.send_message(msg)
+        print(f"[sms] Receipt email sent to {to_email}")
+        return True
+    except Exception as e:
+        print(f"[sms] Receipt email failed: {e}")
         return False

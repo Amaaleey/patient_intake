@@ -14,7 +14,7 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    fhir_id = Column(String, index=True)  # removed unique=True
+    fhir_id = Column(String, index=True)
 
     # Identity
     name = Column(String)
@@ -36,9 +36,14 @@ class Patient(Base):
     appointment_date = Column(String)
     appointment_time = Column(String)
 
+    # Payment
+    payment_status    = Column(String, default="unpaid")
+    payment_intent_id = Column(String, nullable=True)
+    payment_date      = Column(String, nullable=True)
     # Meta
     created_at = Column(DateTime, default=datetime.utcnow)
     extra_data = Column(JSON, default={})
+    
 
 
 class IntakeSession(Base):
