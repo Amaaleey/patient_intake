@@ -26,7 +26,7 @@ from fastmcp import FastMCP
 import importlib
 
 pl = importlib.import_module("services.patient_lookup")
-find_patient = pl.find_patient
+find_patient = pl.search_patient
 load_patients = pl.load_patients
 load_patients()
 
