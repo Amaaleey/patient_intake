@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "cd backend && source .venv/bin/activate && python start_mcp_servers.py & uvicorn main:app --host 0.0.0.0 --port $PORT"
+startCommand = "cd backend && /app/venv/bin/python start_mcp_servers.py & /app/venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
 restartPolicyType = "on_failure"
