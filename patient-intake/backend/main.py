@@ -26,3 +26,6 @@ app.add_middleware(
 
 app.include_router(intake.router, prefix="/intake")
 app.include_router(payment_router)  # ← move here, after app is defined
+@app.get("/health")
+def health():
+    return {"status": "ok"}
