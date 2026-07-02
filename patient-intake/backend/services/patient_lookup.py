@@ -3,10 +3,10 @@ patient_lookup.py — loads patient CSV and searches by name/DOB.
 Uses built-in csv module instead of pandas to avoid numpy dependency.
 """
 import csv
-import os
 from pathlib import Path
 
 _patients: list[dict] = []
+
 
 def load_patients() -> list[dict]:
     global _patients
