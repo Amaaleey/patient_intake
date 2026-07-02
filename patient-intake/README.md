@@ -1,26 +1,31 @@
 # AI Patient Intake Platform
 
-Conversational AI that guides patients through registration, insurance verification, department selection, and appointment booking — in one chat conversation.
+Conversational AI that guides patients through registration, insurance verification, department routing, and appointment booking — in one chat conversation.
 
-Built on Claude Haiku · HAPI FHIR · NIST IAL2 · HIPAA compliant
+**Built on:** Claude Haiku · HAPI FHIR · FastAPI · Next.js · PostgreSQL · Stripe  
+**Compliance:** HIPAA-compliant infrastructure · NIST IAL2 identity · Audit logging
 
 ---
 
 ## What it does
 
-A patient opens the app and has a natural conversation with an AI receptionist. By the end they have a confirmed appointment, verified insurance, and their record saved to the EHR. The full returning patient journey takes under 90 seconds.
+A patient opens the app and has a natural conversation with an AI front-desk receptionist. By the end they have a confirmed appointment, verified insurance, a payment receipt, and their record saved to the EHR. The full returning patient journey takes under 90 seconds.
 
 **Returning patient flow:**
 1. Identifies as returning → gives name + date of birth
-2. AI looks up their record → verifies city and state for identity
-3. Confirms phone and email on file
-4. Insurance verified in real time → copay shown before booking
+2. AI looks up their record → verifies city and state
+3. Confirms phone (last 4 only) and masked email on file
+4. Insurance verified → copay shown before booking
 5. Picks department → describes reason for visit
-6. AI checks for emergencies → suggests correct department if mismatched
+6. AI checks for emergencies → asks follow-up if symptoms are vague
 7. Picks appointment slot
-8. Booked → confirmation card shown
+8. Booked → pays copay (or defers to clinic)
+9. Signs HIPAA consent with e-signature
+10. Confirmation card + email receipt sent
 
-**New patient flow:** Same as above but collects all details fresh and creates a new record in HAPI FHIR.
+**New patient flow:** Same but collects all details fresh and creates a new record in HAPI FHIR.
+
+**Minor patient flow:** If patient is under 18, AI asks for guardian name and relationship before continuing.
 
 ---
 
@@ -28,34 +33,65 @@ A patient opens the app and has a natural conversation with an AI receptionist. 
 
 - Python 3.11+
 - Node.js 18+
-- Docker Desktop
-- An Anthropic API key
+- Docker Desktop (must be running)
+- An [Anthropic API key](https://console.anthropic.com)
+- A [Stripe account](https://dashboard.stripe.com) (test mode is fine)
+- A Gmail account with an [App Password](https://myaccount.google.com/apppasswords) for email receipts
 
 ---
 
-## First time setup
+## First-time setup
 
-**1. Clone and enter the project**
+### 1. Clone and enter the project
+
 ```bash
-cd patient-intake
+git clone https://github.com/AmalAHassan/patient_intake.git
+cd patient_intake/patient-intake
 ```
 
-**2. Copy environment files**
+### 2. Copy and fill in environment variables
+
 ```bash
 cp .env.example .env
 ```
-Open `.env` and add your `ANTHROPIC_API_KEY`. Everything else works as-is for local dev.
 
-**3. Set up the Python virtual environment**
+Open `.env` and fill in these required values:
+
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+DATABASE_URL=postgresql://admin:secret@localhost:5432/patientintake
+REDIS_URL=redis://localhost:6379
+FHIR_BASE_URL=http://localhost:8080/fhir
+
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+
+GMAIL_USER=your@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+DEV_NOTIFY_EMAIL=your@gmail.com
+```
+
+### 3. Set up the Python backend
+
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 cd ..
-make install
 ```
 
-**4. Install frontend dependencies**
+### 4. Create the database tables
+
+```bash
+cd backend
+source .venv/bin/activate
+python3 -c "from models import Base, engine; Base.metadata.create_all(bind=engine); print('Tables created')"
+cd ..
+```
+
+### 5. Install frontend dependencies
+
 ```bash
 cd frontend
 npm install
@@ -66,24 +102,33 @@ cd ..
 
 ## Running the app
 
-You need three terminals open at the same time.
+You need **three terminals** open at the same time.
 
-**Terminal 1 — start the databases**
+**Terminal 1 — start the databases:**
+
 ```bash
 cd patient-intake
 docker-compose up -d
 ```
-Starts PostgreSQL, Redis, and HAPI FHIR in the background.
 
-**Terminal 2 — start the backend**
+Starts PostgreSQL, Redis, and HAPI FHIR in the background. Wait about 20 seconds for HAPI FHIR to finish starting, then verify:
+
+```bash
+curl http://localhost:8080/fhir/metadata | head -5
+```
+
+**Terminal 2 — start the backend:**
+
 ```bash
 cd patient-intake
 source backend/.venv/bin/activate
 make dev
 ```
-Starts 6 MCP servers and the FastAPI backend.
 
-**Terminal 3 — start the frontend**
+Starts 3 MCP servers (ports 5001–5003), the crisis notifier (port 8001), and FastAPI (port 8000).
+
+**Terminal 3 — start the frontend:**
+
 ```bash
 cd patient-intake/frontend
 npm run dev
@@ -92,17 +137,12 @@ npm run dev
 Open **http://localhost:3000** in your browser.
 
 ---
-**Terminal 4 — start the MCP Inspector**
-```bash
-npx @modelcontextprotocol/inspector
-```
 
 ## Stopping everything
 
 ```bash
 # Stop frontend — Ctrl+C in Terminal 3
 # Stop backend — Ctrl+C in Terminal 2
-make stop
 
 # Stop databases
 docker-compose down
@@ -113,7 +153,7 @@ docker-compose down
 ## Ports
 
 | Service | Port | What it is |
-|---|---|---|
+|---------|------|------------|
 | Frontend (Next.js) | 3000 | Patient chat UI |
 | Backend (FastAPI) | 8000 | API + conversation loop |
 | PostgreSQL | 5432 | Sessions + patient records |
@@ -121,122 +161,8 @@ docker-compose down
 | HAPI FHIR | 8080 | EHR patient records |
 | patient-lookup MCP | 5001 | Looks up patients from CSV |
 | eligibility MCP | 5002 | Insurance check (mock) |
-| hapi-fhir MCP | 5003 | Writes patient records |
-| epic MCP | 5004 | Stub — activate when access arrives |
-| athena MCP | 5005 | Stub |
-| cerner MCP | 5006 | Stub |
-
----
-
-## MCP servers
-
-### Local MCP servers (running via make dev)
-
-Six MCP servers run locally as part of `make dev`. Each has an SSE endpoint for remote MCP and an HTTP `/call` endpoint for local routing.
-
-| Server | SSE | HTTP /call |
-|---|---|---|
-| patient-lookup | http://127.0.0.1:5001/sse | http://127.0.0.1:5101/call |
-| eligibility | http://127.0.0.1:5002/sse | http://127.0.0.1:5102/call |
-| hapi-fhir | http://127.0.0.1:5003/sse | http://127.0.0.1:5103/call |
-| epic (stub) | http://127.0.0.1:5004/sse | — |
-| athena (stub) | http://127.0.0.1:5005/sse | — |
-| cerner (stub) | http://127.0.0.1:5006/sse | — |
-
-### Deployed MCP servers (Hugging Face Spaces)
-
-The three active MCP servers are deployed publicly on Hugging Face for remote MCP use.
-
-| Server | Public URL |
-|---|---|
-| patient-lookup | https://amalh1-ledelsea-patient-lookup.hf.space/sse |
-| eligibility | https://amalh1-ledelsea-eligibility.hf.space/sse |
-| hapi-fhir | https://amalh1-hapi-fhir.hf.space/sse |
-
-**Verify all three are running:**
-```bash
-curl -I https://amalh1-ledelsea-patient-lookup.hf.space/sse
-curl -I https://amalh1-ledelsea-eligibility.hf.space/sse
-curl -I https://amalh1-hapi-fhir.hf.space/sse
-```
-All should return `HTTP/2 200`.
-
-**To switch to remote MCP** — update `.env` with the HF URLs and uncomment the remote block in `backend/services/claude.py`. See the MCP switching section below.
-
-### Inspecting MCP servers with MCP Inspector
-
-MCP Inspector lets you browse your MCP servers, see all tools, and call them manually from a visual UI.
-
-**Run Inspector:**
-```bash
-npx @modelcontextprotocol/inspector
-```
-
-Opens at **http://localhost:6274**.
-
-**Connect to a server:**
-1. Set Transport Type to **SSE**
-2. Paste a server URL (local or HF) into the URL field
-3. Click **Connect**
-4. Browse tools and call them with custom inputs
-
-**Local servers to inspect:**
-```
-http://127.0.0.1:5001/sse   ← patient-lookup
-http://127.0.0.1:5002/sse   ← eligibility
-http://127.0.0.1:5003/sse   ← hapi-fhir
-```
-
-**Deployed servers to inspect:**
-```
-https://amalh1-ledelsea-patient-lookup.hf.space/sse
-https://amalh1-ledelsea-eligibility.hf.space/sse
-https://amalh1-hapi-fhir.hf.space/sse
-```
-
-**Test MCP servers programmatically:**
-```bash
-cd patient-intake
-source backend/.venv/bin/activate
-python test_mcp_servers.py
-```
-Runs 8 tests across all 3 active servers and prints pass/fail results.
-
-### Switching between local and remote MCP
-
-**Local mode (default)** — tools are routed through `mcp_client.py` to local servers:
-```python
-# In backend/services/claude.py — active block:
-response = anthropic_client.messages.create(
-    model=MODEL,
-    max_tokens=800,
-    system=system,
-    tools=TOOLS,
-    messages=history,
-)
-```
-
-**Remote mode (Hugging Face)** — Anthropic calls HF servers directly:
-```python
-# In backend/services/claude.py — uncomment this block:
-response = anthropic_client.beta.messages.create(
-    model=MODEL,
-    max_tokens=800,
-    system=system,
-    messages=history,
-    mcp_servers=MCP_SERVERS,
-    betas=["mcp-client-2025-04-04"],
-)
-```
-
-Then update `.env`:
-```
-MCP_PATIENT_LOOKUP_URL=https://amalh1-ledelsea-patient-lookup.hf.space/sse
-MCP_ELIGIBILITY_URL=https://amalh1-ledelsea-eligibility.hf.space/sse
-MCP_EHR_URL=https://amalh1-hapi-fhir.hf.space/sse
-```
-
-Restart with `make dev`.
+| hapi-fhir MCP | 5003 | Writes patient records to FHIR |
+| Crisis notifier | 8001 | Emergency alert dashboard |
 
 ---
 
@@ -249,43 +175,34 @@ patient-intake/
 ├── docker-compose.yml          # PostgreSQL + Redis + HAPI FHIR
 ├── Makefile                    # dev shortcuts
 ├── start_mcp_servers.py        # launches all MCP servers
-├── test_mcp_servers.py         # tests all MCP servers
-├── crisis_notifier.py          # mock crisis alert server
-├── AGENT_GUIDELINES.md         # clinical behavior rules for the AI agent
+├── crisis_notifier.py          # mock crisis alert server (port 8001)
+├── test_evals.py               # LLM evaluation suite (10 tests)
+├── AGENT_GUIDELINES.md         # clinical behavior rules for the AI
 ├── README.md
 │
 ├── frontend/
-│   ├── pages/
-│   │   ├── _app.tsx
-│   │   └── index.tsx           # main chat UI
-│   ├── styles/
-│   │   └── globals.css
-│   ├── next.config.js
-│   └── package.json
-│
-├── hf_spaces/                  # Hugging Face deployment files
-│   ├── patient_lookup/
-│   ├── eligibility/
-│   └── hapi_fhir/
+│   └── pages/
+│       ├── index.tsx           # main chat UI
+│       └── portal.tsx          # patient portal — view statements + pay
 │
 └── backend/
     ├── main.py                 # FastAPI entry point
     ├── config.py               # reads .env
-    ├── models.py               # PostgreSQL models
+    ├── models.py               # PostgreSQL models (Patient, IntakeSession)
+    ├── requirements.txt        # Python dependencies
     ├── routes/
-    │   └── intake.py           # /intake/start, /intake/message, /intake/session
+    │   ├── intake.py           # /intake/start, /intake/message
+    │   └── payment.py          # /payment/create-intent, /payment/confirm, /portal/lookup
     ├── services/
-    │   ├── claude.py           # conversation loop + tool execution
+    │   ├── claude.py           # conversation loop + tool execution + system prompt
     │   ├── mcp_client.py       # routes tool calls to local MCP servers
     │   ├── fhir_client.py      # writes to HAPI FHIR
+    │   ├── sms.py              # email confirmations + payment receipts (Gmail SMTP)
     │   └── patient_lookup.py   # looks up patients from CSV
-    ├── mcp_servers/            # one folder per integration
-    │   ├── patient_lookup/
-    │   ├── eligibility/
-    │   ├── hapi_fhir/          # active EHR (default)
-    │   ├── epic/               # stub
-    │   ├── athena/             # stub
-    │   └── cerner/             # stub
+    ├── mcp_servers/
+    │   ├── patient_lookup/     # looks up patient records
+    │   ├── eligibility/        # insurance eligibility check
+    │   └── hapi_fhir/          # FHIR read/write
     └── data/
         └── patients_enriched.csv   # synthetic patient data for testing
 ```
@@ -295,120 +212,157 @@ patient-intake/
 ## Environment variables
 
 | Variable | Required | Description |
-|---|---|---|
+|----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | ✅ | Your Anthropic API key |
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `REDIS_URL` | ✅ | Redis connection string |
 | `FHIR_BASE_URL` | ✅ | HAPI FHIR URL (default: localhost:8080/fhir) |
-| `EHR_BACKEND` | | Which EHR to write to: `hapi_fhir` (default), `epic`, `athena`, `cerner` |
-| `USE_MOCK_ELIGIBILITY` | | `true` = mock insurance data, `false` = real Availity (default: true) |
-| `AVAILITY_CLIENT_ID` | | Only needed when `USE_MOCK_ELIGIBILITY=false` |
-| `AVAILITY_CLIENT_SECRET` | | Availity secret |
-| `EPIC_CLIENT_ID` | | Only needed when `EHR_BACKEND=epic` |
-| `ATHENA_CLIENT_ID` | | Athena sandbox |
-| `CERNER_CLIENT_ID` | | Cerner sandbox |
-| `MCP_PATIENT_LOOKUP_URL` | | Public URL for remote MCP (default: localhost:5001/sse) |
-| `MCP_ELIGIBILITY_URL` | | Public URL for remote MCP (default: localhost:5002/sse) |
-| `MCP_EHR_URL` | | Public URL for remote MCP (default: localhost:5003/sse) |
-| `CRISIS_NOTIFIER_URL` | | Crisis notification server (default: localhost:8001) |
+| `STRIPE_SECRET_KEY` | ✅ | Stripe secret key (test or live) |
+| `STRIPE_PUBLISHABLE_KEY` | ✅ | Stripe publishable key |
+| `GMAIL_USER` | ✅ | Gmail address for sending confirmations |
+| `GMAIL_APP_PASSWORD` | ✅ | Gmail app password (not your real password) |
+| `DEV_NOTIFY_EMAIL` | ✅ | Where to send receipts in dev |
+| `MCP_PATIENT_LOOKUP_URL` | | MCP server URL (default: localhost:5001/sse) |
+| `MCP_ELIGIBILITY_URL` | | MCP server URL (default: localhost:5002/sse) |
+| `MCP_EHR_URL` | | MCP server URL (default: localhost:5003/sse) |
+| `CRISIS_NOTIFIER_URL` | | Crisis alert server (default: localhost:8001) |
 
 ---
 
-## Switching EHR backends
+## Test card for payments
 
-When Epic, Athena, or Cerner sandbox access arrives, change one line in `.env`:
+Stripe test mode accepts these card details:
 
-```bash
-EHR_BACKEND=epic
+```
+Card number:  4242 4242 4242 4242
+Expiry:       12/34
+CVC:          123
+ZIP:          10001
 ```
 
-Restart with `make dev`. Nothing else changes — the MCP server handles the rest.
+This always succeeds. No real money is charged.
 
 ---
 
-## Switching to real insurance verification
+## Patient portal
 
-By default the app uses mock insurance data. To use real Availity:
+Go to **http://localhost:3000/portal**
 
-1. Sign up at developer.availity.com
-2. Add credentials to `.env`
-3. Set `USE_MOCK_ELIGIBILITY=false`
-4. Restart with `make dev`
+Enter your name and date of birth to view your appointments, see payment status, and pay any outstanding copays.
 
 ---
 
-## Crisis notification (mock)
+## Running the eval suite
 
-The app sends alerts to a local crisis notification server when a patient mentions suicidal thoughts or a medical emergency. Run it in a separate terminal:
+The eval suite runs 10 scripted conversations against your live backend and checks that Claude is following instructions correctly.
 
 ```bash
 cd patient-intake
 source backend/.venv/bin/activate
-python crisis_notifier.py
+python3 test_evals.py
 ```
 
-Open **http://localhost:8001** to see the alert dashboard.
+Make sure `make dev` is running before you run the evals.
 
-In production: replace the mock handler in `crisis_notifier.py` with real dispatch API calls.
+**What it tests:**
+
+| # | Test | Checks |
+|---|------|--------|
+| 01 | Greeting | Opens with new/returning question |
+| 02 | Returning patient lookup | Name → DOB → city/state verification |
+| 03 | Phone masking | Never shows full phone number |
+| 04 | Email masking | Shows masked format only |
+| 05 | Insurance privacy | Never shows member ID |
+| 06 | Emergency detection | Chest pain → 911 redirect |
+| 07 | Crisis detection | Suicidal ideation → 988 redirect |
+| 08 | Minor detection | DOB under 18 → asks for guardian |
+| 09 | Vague symptom | "Headache" → asks follow-up |
+| 10 | Complete flow | All fields captured at completion |
+
+The report shows pass/fail for each check and suggests exactly which line in the system prompt to fix for any failures.
 
 ---
 
 ## Viewing patient data
 
-**In PostgreSQL (quick check):**
+**Quick terminal check:**
+
 ```bash
-docker exec -it patient-intake-postgres-1 psql -U intake_user -d intake_db
-```
-```sql
-SELECT name, department, appointment_doctor, appointment_date FROM patients ORDER BY created_at DESC LIMIT 5;
-\q
+cd patient-intake/backend
+source .venv/bin/activate
+python3 -c "
+from models import SessionLocal, Patient
+db = SessionLocal()
+for p in db.query(Patient).order_by(Patient.created_at.desc()).limit(5).all():
+    print(p.name, '|', p.dob, '|', p.department, '|', p.payment_status)
+db.close()
+"
 ```
 
-**In HAPI FHIR:**
-Open http://localhost:8080 in your browser → click "Patient" to see all records.
+**TablePlus (recommended):** Download from [tableplus.com](https://tableplus.com) and connect with:
+- Host: `localhost` · Port: `5432`
+- Database: `patientintake` · User: `admin` · Password: `secret`
 
-**Using TablePlus (recommended):**
-Download from tableplus.com and connect with host `localhost`, port `5432`, database `intake_db`, user `intake_user`, password `intake_password`.
+**HAPI FHIR UI:** Open [http://localhost:8080](http://localhost:8080) → click Patient.
+
+---
+
+## Crisis notification
+
+When a patient mentions suicidal thoughts or a medical emergency, the AI hard-stops and sends an alert to the crisis notifier dashboard.
+
+View live alerts at **http://localhost:8001** while `make dev` is running.
+
+In production: replace the mock handler in `crisis_notifier.py` with real dispatch API calls.
 
 ---
 
 ## API endpoints
 
 | Method | Path | Description |
-|---|---|---|
+|--------|------|-------------|
 | POST | `/intake/start` | Start a new intake session |
-| POST | `/intake/message` | Send a message and get a reply |
-| GET | `/intake/session/{id}` | Get completed intake data |
+| POST | `/intake/message` | Send a message, get a reply |
+| POST | `/payment/create-intent` | Create Stripe payment intent |
+| POST | `/payment/confirm` | Confirm payment + send receipt |
+| POST | `/portal/lookup` | Look up patient appointments by name + DOB |
+| GET | `/payment/publishable-key` | Get Stripe publishable key |
 | GET | `/health` | Health check |
+| GET | `/docs` | FastAPI auto-generated API docs |
 
 ---
 
 ## Common problems
 
-**`make: pip: No such file or directory`**
-Use `pip3` — or activate the venv first: `source backend/.venv/bin/activate`
+**`make: pip: No such file or directory`**  
+Activate the venv first: `source backend/.venv/bin/activate`
 
-**`Cannot connect to backend`**
-Make sure `make dev` is running. Check http://localhost:8000/docs to verify FastAPI is up.
+**`Cannot connect to backend`**  
+Make sure `make dev` is running. Check [http://localhost:8000/docs](http://localhost:8000/docs) to verify FastAPI is up.
 
-**`Patient not found`**
-The lookup reads from `backend/data/patients_enriched.csv`. Make sure the file exists and has rows. Run `python clean_phones.py` from `backend/` to clean phone number formatting.
+**`Patient not found`**  
+The lookup reads from `backend/data/patients_enriched.csv`. Make sure the file exists and has rows.
 
-**`FHIR write failed`**
-Make sure Docker is running: `docker-compose up -d`. Check http://localhost:8080 to verify HAPI FHIR is up.
+**`FHIR write failed`**  
+Make sure Docker is running: `docker-compose up -d`. Check [http://localhost:8080](http://localhost:8080) to verify HAPI FHIR is up. It takes ~20 seconds to start.
 
-**`MCP servers crashing on startup`**
-Make sure the venv is activated before running `make dev`. MCP servers use the venv Python at `backend/.venv/bin/python3`.
+**`column patients.payment_date does not exist`**  
+The DB schema is out of date. Recreate tables:
+```bash
+cd backend
+source .venv/bin/activate
+python3 -c "from models import Base, engine; Base.metadata.drop_all(bind=engine); Base.metadata.create_all(bind=engine); print('done')"
+```
+Note: this deletes existing patient records.
 
 **`Ports already in use`**
 ```bash
-make stop
-lsof -ti:5001,5002,5003,5004,5005,5006,8000 | xargs kill -9 2>/dev/null; true
+lsof -ti:5001,5002,5003,8000,8001 | xargs kill -9 2>/dev/null; true
 make dev
 ```
 
-**`HF Space returning connection error`**
-Free tier HF Spaces sleep after inactivity. Visit the Space URL to wake it up, then retry. Check status at https://huggingface.co/spaces/amalH1/ledelsea-patient-lookup.
+**`Payment confirm returns 400`**  
+Check that `payment_date` column exists in the DB. If not, recreate tables as above.
 
 ---
 
@@ -417,13 +371,14 @@ Free tier HF Spaces sleep after inactivity. Visit the Space URL to wake it up, t
 The AI agent follows strict clinical rules defined in `AGENT_GUIDELINES.md` at the project root. These are loaded automatically at runtime — edit that file to update agent behavior without touching code.
 
 Key rules:
-- Hard stop and redirect to 911 for medical emergencies
-- Hard stop and provide 988 for mental health crisis
+- Hard stop and redirect to **911** for medical emergencies
+- Hard stop and provide **988** for mental health crises
 - Never diagnose, recommend medication, or interpret results
-- Never substitute or rename a patient's insurance provider
+- Never show insurance member ID to the patient
+- Never show full phone number — last 4 digits only
+- Always mask email addresses
 - Direct patients to call the clinic when human help is needed
 
 ---
 
-*AI Patient Intake Platform · June 2026 · Confidential*
-*Ledelsea · Built on Claude Haiku · HAPI FHIR · NIST IAL2*
+*AI Patient Intake Platform · Ledelsea · Built on Claude Haiku · HAPI FHIR · NIST IAL2*

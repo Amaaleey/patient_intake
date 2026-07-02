@@ -3,6 +3,16 @@ import Head from 'next/head'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 
+// ── Ledelsea brand tokens ──────────────────────────────────────────────────
+// Dark brown:   #2c1a14   (sidebar, header)
+// Mid brown:    #3d2b24   (sidebar hover, card bg)
+// Terracotta:   #8b5e52   (user bubble, accents)
+// Warm cream:   #f5efe8   (page bg)
+// Light cream:  #faf7f3   (chat bg)
+// Card white:   #ffffff
+// Muted text:   #9e8880
+// Border:       #e8ddd6
+
 interface Message {
   role: 'bot' | 'user' | 'error' | 'system'
   text: string
@@ -63,6 +73,12 @@ function cleanBotMessage(text: string): string {
     .trim()
 }
 
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return email
+  const [local, domain] = email.split('@')
+  return `${local.slice(0, 3)}****@${domain}`
+}
+
 function formatDob(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 8)
   if (digits.length <= 2) return digits
@@ -97,15 +113,24 @@ function getQuickReplies(lastBotMsg: string): string[] {
 function QuickReplies({ replies, onSelect }: { replies: string[]; onSelect: (r: string) => void }) {
   if (replies.length === 0) return null
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '4px 0 8px', alignSelf: 'flex-start', maxWidth: 460 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '2px 0 6px', justifyContent: 'flex-start' }}>
       {replies.map(r => (
         <button key={r} onClick={() => onSelect(r)} style={{
-          padding: '7px 14px', borderRadius: 20, border: '1px solid #0d6b52',
-          background: 'transparent', color: '#0d6b52', fontSize: 13,
-          cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', whiteSpace: 'nowrap',
+          padding: '6px 14px', borderRadius: 20,
+          border: '1.5px solid #8b5e52',
+          background: 'transparent', color: '#8b5e52',
+          fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+          transition: 'all 0.15s', whiteSpace: 'nowrap',
+          letterSpacing: '0.01em',
         }}
-          onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = '#0d6b52'; (e.target as HTMLButtonElement).style.color = '#fff' }}
-          onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'transparent'; (e.target as HTMLButtonElement).style.color = '#0d6b52' }}
+          onMouseEnter={e => {
+            (e.target as HTMLButtonElement).style.background = '#8b5e52'
+            ;(e.target as HTMLButtonElement).style.color = '#fff'
+          }}
+          onMouseLeave={e => {
+            (e.target as HTMLButtonElement).style.background = 'transparent'
+            ;(e.target as HTMLButtonElement).style.color = '#8b5e52'
+          }}
         >{r}</button>
       ))}
     </div>
@@ -150,23 +175,29 @@ function PaymentForm({ patientId, copay, patientName, doctor, date, onPaid, onSk
   }
 
   return (
-    <div style={{ background: '#fff', border: '0.5px solid #e2ddd6', borderRadius: 14, padding: '20px 22px', maxWidth: 420, alignSelf: 'flex-start', marginTop: 8 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1916', marginBottom: 4 }}>Pay copay — ${copay}</div>
-      <div style={{ fontSize: 12, color: '#8a8880', marginBottom: 16 }}>{doctor} · {date}</div>
-      <div style={{ border: '1px solid #e2ddd6', borderRadius: 8, padding: '10px 14px', background: '#fafaf8', marginBottom: 12 }}>
-        <CardElement options={{ style: { base: { fontSize: '14px', color: '#1a1916', fontFamily: 'Instrument Sans, sans-serif' } } }} />
+    <div style={{
+      background: '#fff', border: '1px solid #e8ddd6',
+      borderRadius: 16, padding: '18px 20px', maxWidth: 360,
+      alignSelf: 'flex-start', marginTop: 4,
+      boxShadow: '0 1px 4px rgba(44,26,20,0.06)',
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#2c1a14', marginBottom: 2 }}>Pay copay — ${copay}</div>
+      <div style={{ fontSize: 12, color: '#9e8880', marginBottom: 14 }}>{doctor} · {date}</div>
+      <div style={{ border: '1px solid #e8ddd6', borderRadius: 8, padding: '10px 12px', background: '#faf7f3', marginBottom: 10 }}>
+        <CardElement options={{ style: { base: { fontSize: '14px', color: '#2c1a14', fontFamily: 'Barlow, sans-serif' } } }} />
       </div>
-      {error && <div style={{ fontSize: 12, color: '#c04020', marginBottom: 10 }}>{error}</div>}
+      {error && <div style={{ fontSize: 12, color: '#b04030', marginBottom: 8 }}>{error}</div>}
       <button onClick={handlePay} disabled={loading} style={{
-        width: '100%', padding: '10px', borderRadius: 8,
-        background: loading ? '#e2ddd6' : '#0d6b52', border: 'none', color: '#fff',
-        fontSize: 14, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginBottom: 8,
+        width: '100%', padding: '9px', borderRadius: 8,
+        background: loading ? '#c4a89e' : '#8b5e52', border: 'none', color: '#fff',
+        fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer',
+        fontFamily: 'inherit', marginBottom: 6, letterSpacing: '0.02em',
       }}>{loading ? 'Processing...' : `Pay $${copay}`}</button>
       <button onClick={onSkip} disabled={loading} style={{
-        width: '100%', padding: '10px', borderRadius: 8, background: 'transparent',
-        border: '0.5px solid #e2ddd6', color: '#8a8880', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
-      }}>Pay later at the clinic</button>
-      <div style={{ fontSize: 11, color: '#ccc', textAlign: 'center', marginTop: 8 }}>
+        width: '100%', padding: '9px', borderRadius: 8, background: 'transparent',
+        border: '1px solid #e8ddd6', color: '#9e8880', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
+      }}>Pay at the clinic</button>
+      <div style={{ fontSize: 11, color: '#c4a89e', textAlign: 'center', marginTop: 8 }}>
         Test: 4242 4242 4242 4242 · any expiry · any CVC
       </div>
     </div>
@@ -194,12 +225,16 @@ function ConsentForm({ patientName, onSigned }: { patientName: string; onSigned:
   }
 
   if (signed) return (
-    <div style={{ background: '#e0f0ea', border: '0.5px solid #9fd8c0', borderRadius: 12, padding: '16px 20px', maxWidth: 460, alignSelf: 'flex-start', marginTop: 8 }}>
-      <div style={{ fontSize: 13, color: '#0d6b52', fontWeight: 500 }}>Consent signed</div>
-      <div style={{ fontSize: 11, color: '#4a9e75', marginTop: 6 }}>
-        Signed as: <em style={{ fontFamily: selectedFont, fontSize: 18 }}>{finalSig}</em>
+    <div style={{
+      background: '#f5efe8', border: '1px solid #d4c4bc',
+      borderRadius: 16, padding: '14px 18px', maxWidth: 360,
+      alignSelf: 'flex-start', marginTop: 4,
+    }}>
+      <div style={{ fontSize: 13, color: '#6b3d30', fontWeight: 500 }}>Consent signed</div>
+      <div style={{ fontSize: 11, color: '#9e8880', marginTop: 5 }}>
+        Signed as: <em style={{ fontFamily: selectedFont, fontSize: 17, color: '#2c1a14' }}>{finalSig}</em>
       </div>
-      <div style={{ fontSize: 11, color: '#4a9e75', marginTop: 2 }}>
+      <div style={{ fontSize: 11, color: '#9e8880', marginTop: 2 }}>
         {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
       </div>
     </div>
@@ -208,44 +243,56 @@ function ConsentForm({ patientName, onSigned }: { patientName: string; onSigned:
   return (
     <>
       <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Pacifico&family=Great+Vibes&display=swap" rel="stylesheet" />
-      <div style={{ background: '#fff', border: '0.5px solid #e2ddd6', borderRadius: 14, padding: '20px 22px', maxWidth: 460, alignSelf: 'flex-start', marginTop: 8 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1916', marginBottom: 4 }}>HIPAA Consent &amp; Authorization</div>
-        <div style={{ fontSize: 12, color: '#8a8880', lineHeight: 1.6, marginBottom: 16, padding: '10px 12px', background: '#f8f6f1', borderRadius: 8 }}>
-          I authorize Ledelsea Health to use and disclose my protected health information
-          for treatment, payment, and healthcare operations as described in the Notice of
-          Privacy Practices. I acknowledge receipt of the Notice of Privacy Practices.
+      <div style={{
+        background: '#fff', border: '1px solid #e8ddd6',
+        borderRadius: 16, padding: '18px 20px', maxWidth: 360,
+        alignSelf: 'flex-start', marginTop: 4,
+        boxShadow: '0 1px 4px rgba(44,26,20,0.06)',
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#2c1a14', marginBottom: 4 }}>HIPAA Consent</div>
+        <div style={{ fontSize: 11, color: '#9e8880', lineHeight: 1.6, marginBottom: 14, padding: '8px 10px', background: '#faf7f3', borderRadius: 8 }}>
+          I authorize Ledelsea Health to use and disclose my protected health information for treatment, payment, and healthcare operations as described in the Notice of Privacy Practices.
         </div>
-        <div style={{ fontSize: 12, color: '#4a4845', marginBottom: 10, fontWeight: 500 }}>Choose a signature style:</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: '#6b3d30', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Choose a signature</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
           {suggestions.map((s, i) => (
             <button key={i} onClick={() => { setSelected(i); setCustom('') }} style={{
-              padding: '10px 16px', borderRadius: 8, textAlign: 'left',
-              border: selected === i ? '1.5px solid #0d6b52' : '0.5px solid #e2ddd6',
-              background: selected === i ? '#f0f9f5' : '#fafaf8',
-              cursor: 'pointer', fontFamily: s.font, fontSize: 24, color: '#1a1916', transition: 'all 0.15s',
+              padding: '8px 14px', borderRadius: 8, textAlign: 'left',
+              border: selected === i ? '1.5px solid #8b5e52' : '1px solid #e8ddd6',
+              background: selected === i ? '#faf0ec' : '#faf7f3',
+              cursor: 'pointer', fontFamily: s.font, fontSize: 22,
+              color: '#2c1a14', transition: 'all 0.15s',
             }}>{patientName}</button>
           ))}
         </div>
-        <div style={{ fontSize: 12, color: '#8a8880', marginBottom: 6 }}>Or type your own:</div>
+        <div style={{ fontSize: 11, color: '#9e8880', marginBottom: 5 }}>Or type your own</div>
         <input
           value={custom}
           onChange={e => { setCustom(e.target.value); setSelected(null) }}
-          placeholder="Type your full name"
-          style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: custom ? '1.5px solid #0d6b52' : '0.5px solid #e2ddd6', fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', marginBottom: 14 }}
+          placeholder="Your full name"
+          style={{
+            width: '100%', padding: '9px 12px', borderRadius: 8,
+            border: custom ? '1.5px solid #8b5e52' : '1px solid #e8ddd6',
+            fontSize: 14, fontFamily: 'inherit', outline: 'none',
+            boxSizing: 'border-box', marginBottom: 12, background: '#faf7f3',
+          }}
         />
         {finalSig.trim() && (
-          <div style={{ marginBottom: 14, padding: '10px 14px', background: '#f8f6f1', borderRadius: 8 }}>
-            <div style={{ fontSize: 11, color: '#8a8880', marginBottom: 4 }}>Preview:</div>
-            <div style={{ fontFamily: selectedFont, fontSize: selected !== null ? 26 : 16, color: '#1a1916' }}>{finalSig}</div>
+          <div style={{ marginBottom: 12, padding: '8px 12px', background: '#faf7f3', borderRadius: 8 }}>
+            <div style={{ fontSize: 10, color: '#9e8880', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preview</div>
+            <div style={{ fontFamily: selectedFont, fontSize: selected !== null ? 24 : 15, color: '#2c1a14' }}>{finalSig}</div>
           </div>
         )}
         <button onClick={handleSign} disabled={!finalSig.trim()} style={{
-          width: '100%', padding: '10px', borderRadius: 8,
-          background: !finalSig.trim() ? '#e2ddd6' : '#0d6b52',
-          border: 'none', color: '#fff', fontSize: 14,
+          width: '100%', padding: '9px', borderRadius: 8,
+          background: !finalSig.trim() ? '#d4c4bc' : '#8b5e52',
+          border: 'none', color: '#fff', fontSize: 13, fontWeight: 600,
           cursor: !finalSig.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+          letterSpacing: '0.02em',
         }}>I agree &amp; sign</button>
-        <div style={{ fontSize: 11, color: '#aaa', textAlign: 'center', marginTop: 8 }}>By signing you agree to the HIPAA consent above</div>
+        <div style={{ fontSize: 10, color: '#c4a89e', textAlign: 'center', marginTop: 6 }}>
+          By signing you agree to the HIPAA consent above
+        </div>
       </div>
     </>
   )
@@ -257,74 +304,86 @@ function ConfirmationCard({ data, patientId, payStatus, stripePromise, onPaid, o
 }) {
   const Field = ({ label, value }: { label: string; value: string }) =>
     value ? (
-      <div style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: '0.5px solid #e2ddd6' }}>
-        <span style={{ fontSize: 12, color: '#8a8880', minWidth: 110 }}>{label}</span>
-        <span style={{ fontSize: 13, color: '#1a1916', fontWeight: 500 }}>{value}</span>
+      <div style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: '1px solid #f0e8e0' }}>
+        <span style={{ fontSize: 11, color: '#9e8880', minWidth: 100, textTransform: 'uppercase', letterSpacing: '0.05em', paddingTop: 1 }}>{label}</span>
+        <span style={{ fontSize: 13, color: '#2c1a14', fontWeight: 500 }}>{value}</span>
       </div>
     ) : null
 
   const showCopay = data.copay && parseFloat(data.copay) > 0
 
   return (
-    <div style={{ background: '#fff', border: '0.5px solid #e2ddd6', borderRadius: 14, overflow: 'hidden', maxWidth: 460, width: '100%', alignSelf: 'flex-start', marginTop: 8 }}>
-      <div style={{ background: '#0d6b52', padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <div style={{
+      background: '#fff', border: '1px solid #e8ddd6',
+      borderRadius: 16, overflow: 'hidden',
+      maxWidth: 360, width: '100%', alignSelf: 'flex-start', marginTop: 4,
+      boxShadow: '0 2px 8px rgba(44,26,20,0.08)',
+    }}>
+      {/* Header */}
+      <div style={{ background: '#3d2b24', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
             <path d="M1.5 7L5 10.5L12.5 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', marginBottom: 2 }}>Intake complete</div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>You&apos;re all set, {data.name?.split(' ')[0]}</div>
+          <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Intake complete</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>You&apos;re all set, {data.name?.split(' ')[0]}</div>
         </div>
       </div>
 
+      {/* Appointment band */}
       {data.appointment_doctor && (
-        <div style={{ background: '#e0f0ea', padding: '14px 22px', borderBottom: '0.5px solid #e2ddd6' }}>
-          <div style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#0d6b52', marginBottom: 6 }}>Your appointment</div>
-          <div style={{ fontSize: 17, fontWeight: 600, color: '#0d6b52', fontFamily: "'Fraunces', serif", fontStyle: 'italic' }}>{data.appointment_doctor}</div>
-          <div style={{ fontSize: 13, color: '#4a4845', marginTop: 3 }}>{data.appointment_date} · {data.appointment_time} · {data.department}</div>
+        <div style={{ background: '#f5ede6', padding: '12px 20px', borderBottom: '1px solid #e8ddd6' }}>
+          <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8b5e52', marginBottom: 4 }}>Your appointment</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#3d2b24', fontFamily: "'Barlow', sans-serif" }}>{data.appointment_doctor}</div>
+          <div style={{ fontSize: 12, color: '#6b4a40', marginTop: 2 }}>{data.appointment_date} · {data.appointment_time} · {data.department}</div>
         </div>
       )}
 
-      <div style={{ padding: '6px 22px 14px' }}>
+      {/* Fields */}
+      <div style={{ padding: '4px 20px 12px' }}>
         <Field label="Patient"      value={data.name} />
         <Field label="DOB"          value={data.dob} />
         <Field label="Phone"        value={data.phone} />
-        <Field label="Email"        value={data.email} />
+        <Field label="Email"        value={maskEmail(data.email)} />
         <Field label="Insurance"    value={data.payer} />
         <Field label="Reason"       value={data.reason} />
         <Field label="Guardian"     value={data.guardian_name} />
         <Field label="Relationship" value={data.guardian_relationship} />
         {showCopay && (
-          <div style={{ display: 'flex', gap: 12, padding: '9px 0', borderBottom: '0.5px solid #e2ddd6' }}>
-            <span style={{ fontSize: 12, color: '#8a8880', minWidth: 110 }}>Copay</span>
-            <span style={{ fontSize: 13, color: '#1a1916', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 10, padding: '7px 0', borderBottom: '1px solid #f0e8e0' }}>
+            <span style={{ fontSize: 11, color: '#9e8880', minWidth: 100, textTransform: 'uppercase', letterSpacing: '0.05em', paddingTop: 1 }}>Copay</span>
+            <span style={{ fontSize: 13, color: '#2c1a14', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
               ${data.copay}
-              {payStatus === 'paid' && <span style={{ fontSize: 11, background: '#e0f0ea', color: '#0d6b52', padding: '2px 8px', borderRadius: 20 }}>Paid ✓</span>}
-              {payStatus === 'skipped' && <span style={{ fontSize: 11, background: '#fdf0dc', color: '#b06a10', padding: '2px 8px', borderRadius: 20 }}>Pay at clinic</span>}
+              {payStatus === 'paid' && <span style={{ fontSize: 10, background: '#f5ede6', color: '#8b5e52', padding: '2px 7px', borderRadius: 20 }}>Paid ✓</span>}
+              {payStatus === 'skipped' && <span style={{ fontSize: 10, background: '#fdf4e8', color: '#a07030', padding: '2px 7px', borderRadius: 20 }}>Pay at clinic</span>}
             </span>
           </div>
         )}
       </div>
 
+      {/* Pay now / later buttons */}
       {showCopay && payStatus === 'asking' && patientId && stripePromise && (
-        <div style={{ padding: '0 22px 18px' }}>
-          <div style={{ fontSize: 13, color: '#4a4845', marginBottom: 12 }}>
-            Your copay is <strong>${data.copay}</strong>. Would you like to pay now or at the clinic?
+        <div style={{ padding: '0 20px 16px' }}>
+          <div style={{ fontSize: 12, color: '#6b4a40', marginBottom: 10 }}>
+            Your copay is <strong>${data.copay}</strong>. Pay now or at the clinic?
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={onPaid} style={{ padding: '8px 18px', borderRadius: 8, background: '#0d6b52', border: 'none', color: '#fff', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Pay now</button>
-            <button onClick={onSkip} style={{ padding: '8px 18px', borderRadius: 8, background: 'transparent', border: '0.5px solid #e2ddd6', color: '#8a8880', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Pay at clinic</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={onPaid} style={{ padding: '7px 16px', borderRadius: 8, background: '#8b5e52', border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Pay now</button>
+            <button onClick={onSkip} style={{ padding: '7px 16px', borderRadius: 8, background: 'transparent', border: '1px solid #e8ddd6', color: '#9e8880', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Pay at clinic</button>
           </div>
         </div>
       )}
 
-      <div style={{ padding: '14px 22px', borderTop: '0.5px solid #e2ddd6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: '#8a8880' }}>
-          {payStatus === 'paid' ? 'Payment confirmed' : 'A reminder will be sent before your appointment'}
+      {/* Footer */}
+      <div style={{ padding: '10px 20px', borderTop: '1px solid #f0e8e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#faf7f3' }}>
+        <span style={{ fontSize: 10, color: '#9e8880' }}>
+          {payStatus === 'paid' ? 'Payment confirmed' : 'A reminder will be sent before your visit'}
         </span>
-        <button onClick={onRestart} style={{ fontSize: 12, color: '#0d6b52', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500 }}>Start new intake</button>
+        <button onClick={onRestart} style={{ fontSize: 11, color: '#8b5e52', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+          New intake
+        </button>
       </div>
     </div>
   )
@@ -461,7 +520,7 @@ export default function IntakePage() {
   const locked = status !== 'collecting'
   const placeholderText = locked
     ? status === 'emergency_redirect' ? 'Please call 911 or 988 immediately.'
-    : status === 'complete'           ? 'Intake complete — click Start over to begin again.'
+    : status === 'complete'           ? 'Intake complete — tap New intake to start again.'
     : 'Session ended.'
     : isDobQuestion                   ? 'MM / DD / YYYY'
     : quickReplies.length > 0         ? 'Or type your response...'
@@ -473,63 +532,130 @@ export default function IntakePage() {
   return (
     <>
       <Head>
-        <title>Patient Intake — AI Platform</title>
-        <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+        <title>Patient Intake — Ledelsea</title>
+        <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
       </Head>
 
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Instrument Sans', sans-serif" }}>
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f5efe8; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d4c4bc; border-radius: 4px; }
+        @keyframes bounce { 0%,60%,100% { transform: translateY(0) } 30% { transform: translateY(-4px) } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+      `}</style>
 
-        <aside style={{ width: 272, background: '#1a1916', display: 'flex', flexDirection: 'column', padding: '32px 24px 28px', flexShrink: 0, overflowY: 'auto' }}>
-          <div style={{ marginBottom: 36 }}>
-            <div style={{ fontSize: 10, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#8a8880', marginBottom: 8 }}>AI Intake Platform</div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontSize: 20, color: '#fff', lineHeight: 1.2, fontWeight: 300 }}>
-              Patient <em style={{ fontStyle: 'italic', color: '#9fb8ac' }}>Intake</em>
+      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Barlow', sans-serif", background: '#f5efe8' }}>
+
+        {/* ── Sidebar ───────────────────────────────────────────────── */}
+        <aside style={{
+          width: 240, background: '#2c1a14', display: 'flex', flexDirection: 'column',
+          padding: '28px 20px 24px', flexShrink: 0, overflowY: 'auto',
+        }}>
+          {/* Logo */}
+          <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
+              <path d="M14 2L14 18M14 18L6 26M14 18L22 26M14 26L14 30M10 30L18 30" stroke="#c4a49a" strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="14" cy="6" r="3" fill="#8b5e52"/>
+            </svg>
+            <div>
+              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, color: '#fff', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: 1 }}>Ledelsea</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>Patient Intake</div>
             </div>
           </div>
-          <div style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#8a8880', marginBottom: 12 }}>Journey steps</div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+
+          {/* Steps */}
+          <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>Progress</div>
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
             {STEPS.map(step => {
               const isDone = step.id < currentStep
               const isActive = step.id === currentStep
               return (
-                <div key={step.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, border: `1.5px solid ${isDone ? '#1a9e75' : isActive ? '#9fb8ac' : '#444'}`, background: isDone ? '#1a9e75' : isActive ? 'rgba(159,184,172,0.15)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {isDone && <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                <div key={step.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '8px 10px', borderRadius: 8,
+                  background: isActive ? 'rgba(139,94,82,0.2)' : 'transparent',
+                  transition: 'background 0.2s',
+                }}>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                    border: `1.5px solid ${isDone ? '#8b5e52' : isActive ? '#c4a49a' : 'rgba(255,255,255,0.15)'}`,
+                    background: isDone ? '#8b5e52' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {isDone && <svg width="8" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
-                  <span style={{ fontSize: 13, flex: 1, color: isActive ? '#fff' : isDone ? '#aaa' : '#555', fontWeight: isActive ? 500 : 400 }}>{step.label}</span>
-                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, flexShrink: 0, background: isDone ? 'rgba(26,158,117,0.15)' : isActive ? 'rgba(159,184,172,0.15)' : 'rgba(255,255,255,0.06)', color: isDone ? '#1a9e75' : isActive ? '#9fb8ac' : '#555' }}>
-                    {isDone ? 'Done' : step.tag}
+                  <span style={{ fontSize: 12, flex: 1, color: isActive ? '#fff' : isDone ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)', fontWeight: isActive ? 600 : 400 }}>
+                    {step.label}
                   </span>
+                  {(isDone || isActive) && (
+                    <span style={{
+                      fontSize: 9, padding: '1px 6px', borderRadius: 20, flexShrink: 0,
+                      background: isDone ? 'rgba(139,94,82,0.3)' : 'rgba(196,164,154,0.2)',
+                      color: isDone ? '#c4a49a' : 'rgba(255,255,255,0.4)',
+                      letterSpacing: '0.04em',
+                    }}>
+                      {isDone ? 'Done' : step.tag}
+                    </span>
+                  )}
                 </div>
               )
             })}
           </nav>
 
-          <a href="/portal" style={{ display: 'block', marginTop: 16, padding: '10px 12px', borderRadius: 8, border: '0.5px solid #2a2a28', fontSize: 12, color: '#8a8880', textDecoration: 'none', textAlign: 'center' }}>
+          <a href="/portal" style={{
+            display: 'block', marginTop: 16, padding: '9px 10px',
+            borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+            fontSize: 11, color: 'rgba(255,255,255,0.4)', textDecoration: 'none',
+            textAlign: 'center', letterSpacing: '0.02em',
+            transition: 'all 0.15s',
+          }}>
             View statements & pay →
           </a>
-          <div style={{ marginTop: 16, paddingTop: 20, borderTop: '0.5px solid #2a2a28', fontSize: 11, color: '#444', lineHeight: 1.6 }}>
-            Ledelsea · AI Patient Intake<br />HAPI FHIR · NIST IAL2<br />HIPAA compliant
+
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: 'rgba(255,255,255,0.2)', lineHeight: 1.7, letterSpacing: '0.02em' }}>
+            HAPI FHIR · NIST IAL2<br />HIPAA compliant
           </div>
         </aside>
 
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f8f6f1' }}>
-          <div style={{ padding: '16px 28px', background: '#fff', borderBottom: '0.5px solid #e2ddd6', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        {/* ── Main chat area ────────────────────────────────────────── */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f5efe8' }}>
+
+          {/* Header */}
+          <div style={{
+            padding: '14px 24px', background: '#fff',
+            borderBottom: '1px solid #e8ddd6',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
+          }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1916' }}>Patient Registration</div>
-              <div style={{ fontSize: 12, color: '#8a8880', marginTop: 1 }}>Powered by Ledelsea · Secure · HIPAA compliant</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1a14', letterSpacing: '0.01em' }}>Patient Registration</div>
+              <div style={{ fontSize: 11, color: '#9e8880', marginTop: 1 }}>Powered by Ledelsea · Secure · HIPAA compliant</div>
             </div>
-            <button onClick={restart} style={{ fontSize: 12, color: '#4a4845', background: 'none', border: '0.5px solid #e2ddd6', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>Start over</button>
+            <button onClick={restart} style={{
+              fontSize: 11, color: '#6b4a40', background: 'none',
+              border: '1px solid #e8ddd6', borderRadius: 8,
+              padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit',
+              fontWeight: 500, letterSpacing: '0.02em',
+            }}>Start over</button>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Messages */}
+          <div style={{
+            flex: 1, overflowY: 'auto', padding: '20px 24px',
+            display: 'flex', flexDirection: 'column', gap: 6,
+          }}>
             {messages.map((msg, i) => {
               const cleaned = msg.role === 'bot' ? cleanBotMessage(msg.text) : msg.text
               return <Bubble key={i} msg={{ ...msg, text: cleaned }} />
             })}
             {loading && <TypingIndicator />}
 
-            {quickReplies.length > 0 && <QuickReplies replies={quickReplies} onSelect={handleQuickReply} />}
+            {quickReplies.length > 0 && (
+              <div style={{ paddingLeft: 0, marginTop: 2 }}>
+                <QuickReplies replies={quickReplies} onSelect={handleQuickReply} />
+              </div>
+            )}
 
             {status === 'complete' && intakeData && (
               <>
@@ -559,7 +685,11 @@ export default function IntakePage() {
                   />
                 )}
                 {consentSigned && (
-                  <div style={{ background: '#f0f9f5', border: '0.5px solid #9fd8c0', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#0d6b52', maxWidth: 460, alignSelf: 'flex-start' }}>
+                  <div style={{
+                    background: '#f5ede6', border: '1px solid #d4c4bc',
+                    borderRadius: 12, padding: '10px 14px', fontSize: 12,
+                    color: '#6b3d30', maxWidth: 360, alignSelf: 'flex-start',
+                  }}>
                     Consent received. Your registration is complete — see you at your appointment.
                   </div>
                 )}
@@ -567,7 +697,11 @@ export default function IntakePage() {
             )}
 
             {status === 'staff_requested' && (
-              <div style={{ background: '#fdf0dc', border: '0.5px solid #f0c878', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#b06a10', alignSelf: 'center', textAlign: 'center', maxWidth: '80%' }}>
+              <div style={{
+                background: '#fdf4e8', border: '1px solid #e8c878',
+                borderRadius: 12, padding: '10px 14px', fontSize: 12,
+                color: '#8b6020', alignSelf: 'center', textAlign: 'center', maxWidth: '80%',
+              }}>
                 Please call the clinic directly to complete your registration.
               </div>
             )}
@@ -575,36 +709,45 @@ export default function IntakePage() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div style={{ padding: '12px 28px 16px', background: '#fff', borderTop: '0.5px solid #e2ddd6', flexShrink: 0 }}>
-            <div style={{ display: 'flex', gap: 10 }}>
+          {/* Input */}
+          <div style={{
+            padding: '12px 24px 14px', background: '#fff',
+            borderTop: '1px solid #e8ddd6', flexShrink: 0,
+          }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
                 ref={inputRef}
                 value={input}
                 onChange={e => {
-                  if (isDobQuestion) {
-                    setInput(formatDob(e.target.value))
-                  } else {
-                    setInput(e.target.value)
-                  }
+                  if (isDobQuestion) setInput(formatDob(e.target.value))
+                  else setInput(e.target.value)
                 }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
                 placeholder={placeholderText}
                 disabled={locked || loading}
                 style={{
-                  flex: 1, padding: '11px 16px',
-                  border: isDobQuestion ? '1.5px solid #0d6b52' : '1.5px solid #e2ddd6',
+                  flex: 1, padding: '10px 16px',
+                  border: isDobQuestion ? '1.5px solid #8b5e52' : '1.5px solid #e8ddd6',
                   borderRadius: 24, fontSize: 14, outline: 'none', fontFamily: 'inherit',
-                  background: locked ? '#f0ede5' : '#fff', color: '#1a1916',
+                  background: locked ? '#f5efe8' : '#fff', color: '#2c1a14',
                   letterSpacing: isDobQuestion ? '0.08em' : 'normal',
+                  transition: 'border-color 0.15s',
                 }}
               />
-              <button onClick={handleSend} disabled={locked || loading || !input.trim()} style={{
-                width: 42, height: 42, borderRadius: '50%', background: locked || !input.trim() ? '#e2ddd6' : '#0d6b52',
-                border: 'none', cursor: locked || !input.trim() ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background 0.15s',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+              <button
+                onClick={handleSend}
+                disabled={locked || loading || !input.trim()}
+                style={{
+                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                  background: locked || !input.trim() ? '#e8ddd6' : '#8b5e52',
+                  border: 'none', cursor: locked || !input.trim() ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background 0.15s',
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
               </button>
             </div>
@@ -616,29 +759,55 @@ export default function IntakePage() {
 }
 
 function Bubble({ msg }: { msg: Message }) {
-  const isUser = msg.role === 'user'
+  const isUser  = msg.role === 'user'
   const isError = msg.role === 'error'
+
   if (isError) return (
-    <div style={{ background: '#fdeee8', border: '0.5px solid #e8b4a8', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#c04020', lineHeight: 1.6, maxWidth: '88%', alignSelf: 'center', textAlign: 'center' }}>{msg.text}</div>
+    <div style={{
+      background: '#fdeee8', border: '1px solid #e8b4a0',
+      borderRadius: 12, padding: '10px 14px',
+      fontSize: 13, color: '#b04030', lineHeight: 1.55,
+      maxWidth: '80%', alignSelf: 'center', textAlign: 'center',
+      animation: 'fadeIn 0.2s ease',
+    }}>{msg.text}</div>
   )
+
   return (
-    <div style={{ maxWidth: '72%', alignSelf: isUser ? 'flex-end' : 'flex-start' }}>
-      <div style={{ padding: '11px 15px', borderRadius: isUser ? '16px 16px 3px 16px' : '16px 16px 16px 3px', background: isUser ? '#0d6b52' : '#fff', border: isUser ? 'none' : '0.5px solid #e2ddd6', fontSize: 14, lineHeight: 1.55, color: isUser ? '#fff' : '#1a1916', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-        {msg.text}
-      </div>
+    <div style={{
+      maxWidth: '72%',
+      alignSelf: isUser ? 'flex-end' : 'flex-start',
+      animation: 'fadeIn 0.2s ease',
+    }}>
+      <div style={{
+        padding: '10px 14px',
+        borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+        background: isUser ? '#8b5e52' : '#fff',
+        border: isUser ? 'none' : '1px solid #e8ddd6',
+        fontSize: 14, lineHeight: 1.5,
+        color: isUser ? '#fff' : '#2c1a14',
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        boxShadow: isUser ? 'none' : '0 1px 2px rgba(44,26,20,0.04)',
+      }}>{msg.text}</div>
     </div>
   )
 }
 
 function TypingIndicator() {
   return (
-    <div style={{ alignSelf: 'flex-start' }}>
-      <div style={{ display: 'flex', gap: 5, padding: '12px 16px', background: '#fff', border: '0.5px solid #e2ddd6', borderRadius: '16px 16px 16px 3px' }}>
+    <div style={{ alignSelf: 'flex-start', animation: 'fadeIn 0.2s ease' }}>
+      <div style={{
+        display: 'flex', gap: 4, padding: '10px 14px',
+        background: '#fff', border: '1px solid #e8ddd6',
+        borderRadius: '18px 18px 18px 4px',
+        boxShadow: '0 1px 2px rgba(44,26,20,0.04)',
+      }}>
         {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#8a8880', animation: `bounce 1.2s ${i * 0.2}s infinite ease-in-out` }} />
+          <div key={i} style={{
+            width: 6, height: 6, borderRadius: '50%', background: '#c4a49a',
+            animation: `bounce 1.2s ${i * 0.2}s infinite ease-in-out`,
+          }} />
         ))}
       </div>
-      <style>{`@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}`}</style>
     </div>
   )
 }
