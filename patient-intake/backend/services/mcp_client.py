@@ -88,7 +88,7 @@ async def _fallback(tool_name: str, tool_input: dict) -> str:
     Inline fallback if MCP server is down.
     Keeps the app working during development even if a server crashes.
     """
-    from services.patient_lookup import find_patient
+    from services.patient_lookup import search_patient as find_patient
     from services.fhir_client import create_patient
 
     SLOTS = [
