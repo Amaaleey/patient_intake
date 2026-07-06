@@ -124,7 +124,7 @@ async def _fallback(tool_name: str, tool_input: dict) -> str:
             record = find_patient(
                 name=tool_input.get("name"),
                 dob=tool_input.get("dob") or None,
-                phone=tool_input.get("phone") or None,
+                #phone=tool_input.get("phone") or None,
             )
             return json.dumps(record) if record else "NOT_FOUND"
 
