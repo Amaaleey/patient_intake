@@ -464,7 +464,9 @@ export default function IntakePage() {
       } else if (data.status === 'staff_requested') {
         addMessage('bot', clean(data.reply)); setStatus('staff_requested')
       } else if (data.status === 'ended') {
-        setStatus('ended')
+      setStatus('ended')
+      return  // don't add the JSON as a message
+      }
       } else {
         addMessage('bot', clean(data.reply) || 'Something went wrong.')
       }
@@ -500,7 +502,9 @@ export default function IntakePage() {
   const isDobQuestion = status === 'collecting' && !loading && (
     lastBotMsg.toLowerCase().includes('date of birth') ||
     lastBotMsg.toLowerCase().includes('mm/dd/yyyy')
-  )
+  ) && !lastBotMsg.toLowerCase().includes('insurance') &&
+    !lastBotMsg.toLowerCase().includes('phone') &&
+    !lastBotMsg.toLowerCase().includes('email')
 
   const locked = status !== 'collecting'
   const placeholderText = locked
