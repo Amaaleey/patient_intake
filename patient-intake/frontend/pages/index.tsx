@@ -3,16 +3,6 @@ import Head from 'next/head'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 
-// ── Ledelsea brand tokens ──────────────────────────────────────────────────
-// Dark brown:   #2c1a14   (sidebar, header)
-// Mid brown:    #3d2b24   (sidebar hover, card bg)
-// Terracotta:   #8b5e52   (user bubble, accents)
-// Warm cream:   #f5efe8   (page bg)
-// Light cream:  #faf7f3   (chat bg)
-// Card white:   #ffffff
-// Muted text:   #9e8880
-// Border:       #e8ddd6
-
 interface Message {
   role: 'bot' | 'user' | 'error' | 'system'
   text: string
@@ -319,7 +309,6 @@ function ConfirmationCard({ data, patientId, payStatus, stripePromise, onPaid, o
       maxWidth: 360, width: '100%', alignSelf: 'flex-start', marginTop: 4,
       boxShadow: '0 2px 8px rgba(44,26,20,0.08)',
     }}>
-      {/* Header */}
       <div style={{ background: '#3d2b24', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
@@ -332,7 +321,6 @@ function ConfirmationCard({ data, patientId, payStatus, stripePromise, onPaid, o
         </div>
       </div>
 
-      {/* Appointment band */}
       {data.appointment_doctor && (
         <div style={{ background: '#f5ede6', padding: '12px 20px', borderBottom: '1px solid #e8ddd6' }}>
           <div style={{ fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8b5e52', marginBottom: 4 }}>Your appointment</div>
@@ -341,7 +329,6 @@ function ConfirmationCard({ data, patientId, payStatus, stripePromise, onPaid, o
         </div>
       )}
 
-      {/* Fields */}
       <div style={{ padding: '4px 20px 12px' }}>
         <Field label="Patient"      value={data.name} />
         <Field label="DOB"          value={data.dob} />
@@ -363,7 +350,6 @@ function ConfirmationCard({ data, patientId, payStatus, stripePromise, onPaid, o
         )}
       </div>
 
-      {/* Pay now / later buttons */}
       {showCopay && payStatus === 'asking' && patientId && stripePromise && (
         <div style={{ padding: '0 20px 16px' }}>
           <div style={{ fontSize: 12, color: '#6b4a40', marginBottom: 10 }}>
@@ -376,7 +362,6 @@ function ConfirmationCard({ data, patientId, payStatus, stripePromise, onPaid, o
         </div>
       )}
 
-      {/* Footer */}
       <div style={{ padding: '10px 20px', borderTop: '1px solid #f0e8e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#faf7f3' }}>
         <span style={{ fontSize: 10, color: '#9e8880' }}>
           {payStatus === 'paid' ? 'Payment confirmed' : 'A reminder will be sent before your visit'}
@@ -532,282 +517,4 @@ export default function IntakePage() {
   return (
     <>
       <Head>
-        <title>Patient Intake — Ledelsea</title>
-        <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
-      </Head>
-
-      <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #f5efe8; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #d4c4bc; border-radius: 4px; }
-        @keyframes bounce { 0%,60%,100% { transform: translateY(0) } 30% { transform: translateY(-4px) } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
-      `}</style>
-
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: "'Barlow', sans-serif", background: '#f5efe8' }}>
-
-        {/* ── Sidebar ───────────────────────────────────────────────── */}
-        <aside style={{
-          width: 240, background: '#2c1a14', display: 'flex', flexDirection: 'column',
-          padding: '28px 20px 24px', flexShrink: 0, overflowY: 'auto',
-        }}>
-          {/* Logo */}
-          <div style={{ marginBottom: 32, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <svg width="28" height="32" viewBox="0 0 28 32" fill="none">
-              <path d="M14 2L14 18M14 18L6 26M14 18L22 26M14 26L14 30M10 30L18 30" stroke="#c4a49a" strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="14" cy="6" r="3" fill="#8b5e52"/>
-            </svg>
-            <div>
-              <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, color: '#fff', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', lineHeight: 1 }}>Ledelsea</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>Patient Intake</div>
-            </div>
-          </div>
-
-          {/* Steps */}
-          <div style={{ fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: 10 }}>Progress</div>
-          <nav style={{ display: 'flex', flexDirection: 'column', gap: 1, flex: 1 }}>
-            {STEPS.map(step => {
-              const isDone = step.id < currentStep
-              const isActive = step.id === currentStep
-              return (
-                <div key={step.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 10px', borderRadius: 8,
-                  background: isActive ? 'rgba(139,94,82,0.2)' : 'transparent',
-                  transition: 'background 0.2s',
-                }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    border: `1.5px solid ${isDone ? '#8b5e52' : isActive ? '#c4a49a' : 'rgba(255,255,255,0.15)'}`,
-                    background: isDone ? '#8b5e52' : 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {isDone && <svg width="8" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                  </div>
-                  <span style={{ fontSize: 12, flex: 1, color: isActive ? '#fff' : isDone ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)', fontWeight: isActive ? 600 : 400 }}>
-                    {step.label}
-                  </span>
-                  {(isDone || isActive) && (
-                    <span style={{
-                      fontSize: 9, padding: '1px 6px', borderRadius: 20, flexShrink: 0,
-                      background: isDone ? 'rgba(139,94,82,0.3)' : 'rgba(196,164,154,0.2)',
-                      color: isDone ? '#c4a49a' : 'rgba(255,255,255,0.4)',
-                      letterSpacing: '0.04em',
-                    }}>
-                      {isDone ? 'Done' : step.tag}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </nav>
-
-          <a href="/portal" style={{
-            display: 'block', marginTop: 16, padding: '9px 10px',
-            borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
-            fontSize: 11, color: 'rgba(255,255,255,0.4)', textDecoration: 'none',
-            textAlign: 'center', letterSpacing: '0.02em',
-            transition: 'all 0.15s',
-          }}>
-            View statements & pay →
-          </a>
-
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: 'rgba(255,255,255,0.2)', lineHeight: 1.7, letterSpacing: '0.02em' }}>
-            HAPI FHIR · NIST IAL2<br />HIPAA compliant
-          </div>
-        </aside>
-
-        {/* ── Main chat area ────────────────────────────────────────── */}
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f5efe8' }}>
-
-          {/* Header */}
-          <div style={{
-            padding: '14px 24px', background: '#fff',
-            borderBottom: '1px solid #e8ddd6',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-          }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#2c1a14', letterSpacing: '0.01em' }}>Patient Registration</div>
-              <div style={{ fontSize: 11, color: '#9e8880', marginTop: 1 }}>Powered by Ledelsea · Secure · HIPAA compliant</div>
-            </div>
-            <button onClick={restart} style={{
-              fontSize: 11, color: '#6b4a40', background: 'none',
-              border: '1px solid #e8ddd6', borderRadius: 8,
-              padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit',
-              fontWeight: 500, letterSpacing: '0.02em',
-            }}>Start over</button>
-          </div>
-
-          {/* Messages */}
-          <div style={{
-            flex: 1, overflowY: 'auto', padding: '20px 24px',
-            display: 'flex', flexDirection: 'column', gap: 6,
-          }}>
-            {messages.map((msg, i) => {
-              const cleaned = msg.role === 'bot' ? cleanBotMessage(msg.text) : msg.text
-              return <Bubble key={i} msg={{ ...msg, text: cleaned }} />
-            })}
-            {loading && <TypingIndicator />}
-
-            {quickReplies.length > 0 && (
-              <div style={{ paddingLeft: 0, marginTop: 2 }}>
-                <QuickReplies replies={quickReplies} onSelect={handleQuickReply} />
-              </div>
-            )}
-
-            {status === 'complete' && intakeData && (
-              <>
-                <ConfirmationCard
-                  data={intakeData} patientId={patientId} payStatus={payStatus} stripePromise={stripePromise}
-                  onPaid={() => { setPayStatus('paying'); setShowStripe(true) }}
-                  onSkip={() => setPayStatus('skipped')}
-                  onRestart={restart}
-                />
-                {(payStatus === 'paying' || showStripe) && patientId && stripePromise && intakeData.copay && (
-                  <Elements stripe={stripePromise}>
-                    <PaymentForm
-                      patientId={patientId} copay={intakeData.copay} patientName={intakeData.name}
-                      doctor={intakeData.appointment_doctor} date={intakeData.appointment_date}
-                      onPaid={() => { setPayStatus('paid'); setShowStripe(false) }}
-                      onSkip={() => { setPayStatus('skipped'); setShowStripe(false) }}
-                    />
-                  </Elements>
-                )}
-                {showConsent && (
-                  <ConsentForm
-                    patientName={intakeData.guardian_name || intakeData.name}
-                    onSigned={(sig) => {
-                      setConsentSigned(true)
-                      console.log(`[consent] Signed as: ${sig} at ${new Date().toISOString()}`)
-                    }}
-                  />
-                )}
-                {consentSigned && (
-                  <div style={{
-                    background: '#f5ede6', border: '1px solid #d4c4bc',
-                    borderRadius: 12, padding: '10px 14px', fontSize: 12,
-                    color: '#6b3d30', maxWidth: 360, alignSelf: 'flex-start',
-                  }}>
-                    Consent received. Your registration is complete — see you at your appointment.
-                  </div>
-                )}
-              </>
-            )}
-
-            {status === 'staff_requested' && (
-              <div style={{
-                background: '#fdf4e8', border: '1px solid #e8c878',
-                borderRadius: 12, padding: '10px 14px', fontSize: 12,
-                color: '#8b6020', alignSelf: 'center', textAlign: 'center', maxWidth: '80%',
-              }}>
-                Please call the clinic directly to complete your registration.
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div style={{
-            padding: '12px 24px 14px', background: '#fff',
-            borderTop: '1px solid #e8ddd6', flexShrink: 0,
-          }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={e => {
-                  if (isDobQuestion) setInput(formatDob(e.target.value))
-                  else setInput(e.target.value)
-                }}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                placeholder={placeholderText}
-                disabled={locked || loading}
-                style={{
-                  flex: 1, padding: '10px 16px',
-                  border: isDobQuestion ? '1.5px solid #8b5e52' : '1.5px solid #e8ddd6',
-                  borderRadius: 24, fontSize: 14, outline: 'none', fontFamily: 'inherit',
-                  background: locked ? '#f5efe8' : '#fff', color: '#2c1a14',
-                  letterSpacing: isDobQuestion ? '0.08em' : 'normal',
-                  transition: 'border-color 0.15s',
-                }}
-              />
-              <button
-                onClick={handleSend}
-                disabled={locked || loading || !input.trim()}
-                style={{
-                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                  background: locked || !input.trim() ? '#e8ddd6' : '#8b5e52',
-                  border: 'none', cursor: locked || !input.trim() ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background 0.15s',
-                }}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13" />
-                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
-    </>
-  )
-}
-
-function Bubble({ msg }: { msg: Message }) {
-  const isUser  = msg.role === 'user'
-  const isError = msg.role === 'error'
-
-  if (isError) return (
-    <div style={{
-      background: '#fdeee8', border: '1px solid #e8b4a0',
-      borderRadius: 12, padding: '10px 14px',
-      fontSize: 13, color: '#b04030', lineHeight: 1.55,
-      maxWidth: '80%', alignSelf: 'center', textAlign: 'center',
-      animation: 'fadeIn 0.2s ease',
-    }}>{msg.text}</div>
-  )
-
-  return (
-    <div style={{
-      maxWidth: '72%',
-      alignSelf: isUser ? 'flex-end' : 'flex-start',
-      animation: 'fadeIn 0.2s ease',
-    }}>
-      <div style={{
-        padding: '10px 14px',
-        borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-        background: isUser ? '#8b5e52' : '#fff',
-        border: isUser ? 'none' : '1px solid #e8ddd6',
-        fontSize: 14, lineHeight: 1.5,
-        color: isUser ? '#fff' : '#2c1a14',
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-        boxShadow: isUser ? 'none' : '0 1px 2px rgba(44,26,20,0.04)',
-      }}>{msg.text}</div>
-    </div>
-  )
-}
-
-function TypingIndicator() {
-  return (
-    <div style={{ alignSelf: 'flex-start', animation: 'fadeIn 0.2s ease' }}>
-      <div style={{
-        display: 'flex', gap: 4, padding: '10px 14px',
-        background: '#fff', border: '1px solid #e8ddd6',
-        borderRadius: '18px 18px 18px 4px',
-        boxShadow: '0 1px 2px rgba(44,26,20,0.04)',
-      }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{
-            width: 6, height: 6, borderRadius: '50%', background: '#c4a49a',
-            animation: `bounce 1.2s ${i * 0.2}s infinite ease-in-out`,
-          }} />
-        ))}
-      </div>
-    </div>
-  )
-}
+        <title>Patient Intake —
