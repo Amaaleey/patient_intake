@@ -21,7 +21,7 @@ def load_patients() -> list[dict]:
         if path.exists():
             with open(path, newline="", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
-                _patients = [{k: (v or "") for k, v in row.items()} for row in reader]
+                _patients = [{k.lower().strip(): (v or "") for k, v in row.items()} for row in reader]
             print(f"[patient_lookup] Loaded {len(_patients)} patients from {path}")
             return _patients
 

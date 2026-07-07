@@ -6,6 +6,12 @@ Runs on port 5001.
 import sys
 import os
 import json
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import uvicorn as _uvicorn
+from fastmcp import FastMCP
+import importlib
+
 
 BACKEND_DIR = os.environ.get(
     "MCP_BACKEND_DIR",
@@ -22,37 +28,31 @@ for env_path in [
         load_dotenv(env_path)
         break
 
-from fastmcp import FastMCP
-import importlib
 
 pl = importlib.import_module("services.patient_lookup")
-find_patient = pl.search_patient
+find_patient  = pl.search_patient
 load_patients = pl.load_patients
 load_patients()
 
 mcp = FastMCP("patient-lookup")
 
-# Plain function — called directly by /call endpoint
-def _lookup_patient(name: str, dob: str = "", phone: str = "") -> str:
-    record = find_patient(name=name, dob=dob or None, phone=phone or None)
+
+def _lookup_patient(name: str, dob: str = "") -> str:
+    record = find_patient(name=name, dob=dob or "")
     if not record:
         return "NOT_FOUND"
     return json.dumps(record)
 
-# MCP tool — wraps the plain function for Anthropic
+
 @mcp.tool
-def lookup_patient(name: str, dob: str = "", phone: str = "") -> str:
+def lookup_patient(name: str, dob: str = "") -> str:
     """
     Look up a patient in the practice database.
-    Call as soon as you have the patient's name plus EITHER their
-    date of birth OR their phone number.
+    Call as soon as you have the patient's name and date of birth.
     Returns the matching patient record or NOT_FOUND.
     """
-    return _lookup_patient(name=name, dob=dob, phone=phone)
+    return _lookup_patient(name=name, dob=dob)
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-import uvicorn as _uvicorn
 
 http_app = FastAPI()
 
@@ -63,7 +63,10 @@ async def call_tool_http(request: Request):
     tool_input = body.get("input", {})
     try:
         if tool_name == "lookup_patient":
-            result = _lookup_patient(**tool_input)
+            result = _lookup_patient(
+                name=tool_input.get("name", ""),
+                dob=tool_input.get("dob", ""),
+            )
             return JSONResponse({"result": result})
         return JSONResponse({"error": f"Tool not found: {tool_name}"}, status_code=404)
     except Exception as e:
@@ -71,8 +74,10 @@ async def call_tool_http(request: Request):
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
 
+
 if __name__ == "__main__":
-    import threading, uvicorn as _uv
+    import threading
+    import uvicorn as _uv
 
     def run_http():
         _uv.run(http_app, host="127.0.0.1", port=5101, log_level="error")
