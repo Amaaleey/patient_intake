@@ -354,11 +354,17 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
 
     result = {"reply": assistant_text, "status": "collecting", "data": None}
 
-    if '{"status": "emergency_redirect"}' in assistant_text:
-        friendly = assistant_text[:assistant_text.find('{"status": "emergency_redirect"}')].strip()
+    crisis_keywords = ["988", "suicide", "crisis lifeline", "911", "immediate danger", "emergency_redirect"]
+    is_emergency = '{"status": "emergency_redirect"}' in assistant_text or \
+                any(kw in assistant_text.lower() for kw in crisis_keywords)
+
+    if is_emergency:
+        friendly = assistant_text
+        if '{"status": "emergency_redirect"}' in assistant_text:
+            friendly = assistant_text[:assistant_text.find('{"status": "emergency_redirect"}')].strip()
         result.update({"reply": friendly, "status": "emergency_redirect"})
         text_lower = assistant_text.lower()
-        is_crisis  = any(kw in text_lower for kw in ["988", "suicidal", "self-harm"])
+        is_crisis = any(kw in text_lower for kw in ["988", "suicidal", "self-harm", "tired of life", "can't do this"])
         asyncio.create_task(_send_crisis_alert(
             session_id=session_id,
             alert_type="mental_health_crisis" if is_crisis else "medical_emergency",
