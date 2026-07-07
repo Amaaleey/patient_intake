@@ -365,12 +365,12 @@ async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -
         result.update({"reply": friendly, "status": "emergency_redirect"})
         text_lower = assistant_text.lower()
         is_crisis = any(kw in text_lower for kw in ["988", "suicidal", "self-harm", "tired of life", "can't do this"])
-        asyncio.create_task(_send_crisis_alert(
+        await _send_crisis_alert(
             session_id=session_id,
             alert_type="mental_health_crisis" if is_crisis else "medical_emergency",
             reason=history[-2]["content"] if len(history) >= 2 else "unknown",
             client_ip=client_ip,
-        ))
+        )
         return result
 
     if '{"status": "staff_requested"}' in assistant_text:
