@@ -1,3 +1,8 @@
+.DS_Store
 .env
-.env
+__pycache__/
+.venv/
+*.pyc
+.next/
 node_modules/
+
