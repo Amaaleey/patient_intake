@@ -145,7 +145,7 @@ MINOR CHECK (run immediately after DOB is collected, before asking for phone or 
     Say: "I see this appointment is for a minor. We'll need a parent or guardian to complete the registration."
     Then collect one at a time:
     - "What is your full name?" (guardian name)
-    - - "What is your relationship to [patient name]?" 
+    - "What is your relationship to [patient name]?"
   Accept answers like: mother, father, parent, grandparent, legal guardian, stepparent.
   The guardian is describing their relationship TO the child, not the child's relationship to them.
     Say: "Thank you, [guardian name]. I'll note that you are booking on behalf of [patient name]."
@@ -213,6 +213,8 @@ async def _send_crisis_alert(
 ):
     patient_name    = "unknown"
     patient_address = "unknown"
+
+    # Extract patient info from Redis
     try:
         collected_json = redis_client.get(f"session:{session_id}:collected")
         if collected_json:
@@ -236,6 +238,21 @@ async def _send_crisis_alert(
     except Exception as e:
         print(f"[crisis] Could not extract patient info: {e}")
 
+    # Always log to Railway deploy logs
+    print(f"")
+    print(f"[crisis] {'='*55}")
+    print(f"[crisis] ⚠️  CRISIS ALERT DETECTED")
+    print(f"[crisis] {'='*55}")
+    print(f"[crisis] Type:      {alert_type}")
+    print(f"[crisis] Patient:   {patient_name}")
+    print(f"[crisis] Address:   {patient_address}")
+    print(f"[crisis] IP:        {client_ip}")
+    print(f"[crisis] Session:   {session_id}")
+    print(f"[crisis] Reason:    {reason if isinstance(reason, str) else str(reason)}")
+    print(f"[crisis] {'='*55}")
+    print(f"")
+
+    # Try local notifier (works in local dev, not on Railway)
     payload = {
         "type":            alert_type,
         "session_id":      session_id,
@@ -247,9 +264,39 @@ async def _send_crisis_alert(
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             await client.post(f"{CRISIS_NOTIFIER_URL}/alert", json=payload)
-            print(f"[crisis] Alert sent: {alert_type} — {patient_name}")
-    except Exception as e:
-        print(f"[crisis] Could not reach notifier: {e}")
+            print(f"[crisis] Notifier server reached — alert forwarded")
+    except Exception:
+        print(f"[crisis] Notifier server not running — alert logged above")
+
+    # ── Always log to Railway deploy logs ───────────────────────────────
+    print(f"")
+    print(f"[crisis] {'='*55}")
+    print(f"[crisis] ⚠️  CRISIS ALERT DETECTED")
+    print(f"[crisis] {'='*55}")
+    print(f"[crisis] Type:      {alert_type}")
+    print(f"[crisis] Patient:   {patient_name}")
+    print(f"[crisis] Address:   {patient_address}")
+    print(f"[crisis] IP:        {client_ip}")
+    print(f"[crisis] Session:   {session_id}")
+    print(f"[crisis] Reason:    {reason if isinstance(reason, str) else str(reason)}")
+    print(f"[crisis] {'='*55}")
+    print(f"")
+
+    # ── Try local notifier (works in local dev, not on Railway) ─────────
+    payload = {
+        "type":            alert_type,
+        "session_id":      session_id,
+        "patient_name":    patient_name,
+        "patient_address": patient_address,
+        "client_ip":       client_ip,
+        "reason":          reason if isinstance(reason, str) else str(reason),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(f"{CRISIS_NOTIFIER_URL}/alert", json=payload)
+            print(f"[crisis] Notifier server reached — alert forwarded")
+    except Exception:
+        print(f"[crisis] Notifier server not running — alert logged above")
 
 
 async def chat(session_id: str, user_message: str, client_ip: str = "unknown") -> dict:
