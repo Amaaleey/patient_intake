@@ -1,0 +1,8 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Instrument Sans', sans-serif;
+  background: #f8f6f1;
+  color: #1a1916;
+  -webkit-font-smoothing: antialiased;
+}
