@@ -41,7 +41,7 @@ def send_appointment_confirmation(to_number, patient_name, doctor, date, time, d
         msg["From"]    = gmail_user
         msg["To"]      = to_email
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 587) as smtp:
             smtp.login(gmail_user, gmail_pass)
             smtp.send_message(msg)
         print(f"[sms] Confirmation email sent to {to_email}")
@@ -85,7 +85,7 @@ def send_payment_receipt(
         msg["From"]    = gmail_user
         msg["To"]      = to_email
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 587) as smtp:
             smtp.login(gmail_user, gmail_pass)
             smtp.send_message(msg)
         print(f"[sms] Receipt email sent to {to_email}")
