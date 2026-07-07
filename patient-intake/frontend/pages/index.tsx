@@ -460,13 +460,15 @@ export default function IntakePage() {
           setPayStatus('skipped')
         }
       } else if (data.status === 'emergency_redirect') {
-        addMessage('error', clean(data.reply)); setStatus('emergency_redirect'); setCurrentStep(8)
+        addMessage('error', clean(data.reply))
+        setStatus('emergency_redirect')
+        setCurrentStep(8)
       } else if (data.status === 'staff_requested') {
-        addMessage('bot', clean(data.reply)); setStatus('staff_requested')
+        addMessage('bot', clean(data.reply))
+        setStatus('staff_requested')
       } else if (data.status === 'ended') {
-      setStatus('ended')
-      return  // don't add the JSON as a message
-      }
+        setStatus('ended')
+        // don't add JSON as a message — just silently end
       } else {
         addMessage('bot', clean(data.reply) || 'Something went wrong.')
       }
@@ -499,12 +501,16 @@ export default function IntakePage() {
   const quickReplies = status === 'collecting' && !loading && !quickReplyUsed
     ? getQuickReplies(lastBotMsg) : []
 
-  const isDobQuestion = status === 'collecting' && !loading && (
-    lastBotMsg.toLowerCase().includes('date of birth') ||
-    lastBotMsg.toLowerCase().includes('mm/dd/yyyy')
-  ) && !lastBotMsg.toLowerCase().includes('insurance') &&
+  // Only trigger DOB keyboard when question is specifically about date of birth
+  // not when asking about phone, email, insurance, or other topics
+  const isDobQuestion = status === 'collecting' && !loading &&
+    (lastBotMsg.toLowerCase().includes('date of birth') ||
+     lastBotMsg.toLowerCase().includes('mm/dd/yyyy')) &&
+    !lastBotMsg.toLowerCase().includes('insurance') &&
     !lastBotMsg.toLowerCase().includes('phone') &&
-    !lastBotMsg.toLowerCase().includes('email')
+    !lastBotMsg.toLowerCase().includes('email') &&
+    !lastBotMsg.toLowerCase().includes('confirm') &&
+    !lastBotMsg.toLowerCase().includes('details')
 
   const locked = status !== 'collecting'
   const placeholderText = locked
@@ -708,6 +714,7 @@ export default function IntakePage() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
                 placeholder={placeholderText}
                 disabled={locked || loading}
+                inputMode={isDobQuestion ? 'numeric' : 'text'}
                 style={{
                   flex: 1, padding: '10px 16px',
                   border: isDobQuestion ? '1.5px solid #8b5e52' : '1.5px solid #e8ddd6',
